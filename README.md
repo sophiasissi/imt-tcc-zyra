@@ -44,21 +44,26 @@ O ZYRA surge como uma solução tecnológica para esse problema.
 ## 🧠 Tecnologias utilizadas
 
 ### 📱 Front-end
+
 - React Native
 - Expo
 - TypeScript
 
 ### ⚙️ Back-end
+
 - Node.js
 - NestJS
 
 ### ☁️ Infraestrutura
+
 - AWS (RDS, S3, Cognito)
 
 ### 🤖 Inteligência Artificial
+
 - OpenAI API
 
 ### 👁️ Visão Computacional
+
 - Python
 - OpenCV
 
@@ -78,3 +83,4 @@ Backend API (NestJS)
  ├── Banco de dados (AWS RDS)
  ├── OpenAI API (IA)
  └── Serviço de visão computacional (Python/OpenCV)
+```
