@@ -27,7 +27,11 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [fontsLoaded]);
 
-  if (!fontsLoaded || isLoading) {
+  if (!fontsLoaded) {
+    return null;
+  }
+
+  if (isLoading) {
     return <SplashScreen />;
   }
 
