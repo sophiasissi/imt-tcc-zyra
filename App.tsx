@@ -1,20 +1,35 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { useFonts } from 'expo-font';
+
+import { SplashScreen } from './src/screens/SplashScreen';
+import { IntroScreen } from './src/screens/IntroScreen';
 
 export default function App() {
-  return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app! OI</Text>
-      <StatusBar style="auto" />
-    </View>
-  );
-}
+  const [isLoading, setIsLoading] = useState(true);
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+  const [fontsLoaded] = useFonts({
+    PoppinsRegular: require('./assets/fonts/Poppins/Poppins-Regular.ttf'),
+    PoppinsMedium: require('./assets/fonts/Poppins/Poppins-Medium.ttf'),
+    PoppinsSemiBold: require('./assets/fonts/Poppins/Poppins-SemiBold.ttf'),
+    PoppinsBold: require('./assets/fonts/Poppins/Poppins-Bold.ttf'),
+    PoppinsExtraBold: require('./assets/fonts/Poppins/Poppins-ExtraBold.ttf'),
+    PoppinsBlack: require('./assets/fonts/Poppins/Poppins-Black.ttf'),
+    Jomhuria: require('./assets/fonts/Jomhuria/Jomhuria-Regular.ttf'),
+  });
+
+  useEffect(() => {
+    if (!fontsLoaded) return;
+
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded || isLoading) {
+    return <SplashScreen />;
+  }
+
+  return <IntroScreen />;
+}
