@@ -1,31 +1,34 @@
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { theme } from '../styles/theme';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
+import YellowTshirt from '../../assets/images/yellowTshirt.svg';
+import BlueSkirt from '../../assets/images/blueSkirt.svg';
+import PinkPants from '../../assets/images/pinkPants.svg';
 
-export function IntroScreen() {
+type Props = NativeStackScreenProps<RootStackParamList, 'Intro'>;
+
+export function IntroScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
-      <Image
-        source={require('../../assets/images/yellowTshirt.png')}
-        style={styles.yellowTshirt}
-      />
-      <Image
-        source={require('../../assets/images/blueSkirt.png')}
-        style={styles.blueSkirt}
-      />
-      <Image
-        source={require('../../assets/images/pinkPants.png')}
-        style={styles.pinkPants}
-      />
+      <YellowTshirt style={styles.yellowTshirt} />
+      <BlueSkirt style={styles.blueSkirt} />
+      <PinkPants style={styles.pinkPants} />
 
       <Text style={styles.logo}>ZYRA</Text>
 
-      <Text style={styles.subtitle}>Monte looks com confiança, todos os dias</Text>
+      <Text style={styles.subtitle}>
+        Monte looks com confiança, todos os dias
+      </Text>
 
-      <TouchableOpacity style={styles.primaryButton}>
+      <TouchableOpacity
+        style={styles.primaryButton}
+        onPress={() => navigation.navigate('RegisterStart')}
+      >
         <Text style={styles.primaryButtonText}>Começar agora</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity>
+      <TouchableOpacity onPress={() => navigation.navigate('Login')}>
         <Text style={styles.loginText}>Entrar</Text>
       </TouchableOpacity>
     </View>
@@ -50,7 +53,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontFamily: theme.fonts.regular,
-    fontSize: 20,
+    fontSize: 16,
     textAlign: 'center',
     color: '#000000',
     marginBottom: 42,
@@ -73,12 +76,12 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: '#FFFFFF',
     fontFamily: theme.fonts.bold,
-    fontSize: 20,
+    fontSize: 16,
   },
   loginText: {
     color: '#000000',
     fontFamily: theme.fonts.bold,
-    fontSize: 20,
+    fontSize: 18,
   },
   yellowTshirt: {
     position: 'absolute',
