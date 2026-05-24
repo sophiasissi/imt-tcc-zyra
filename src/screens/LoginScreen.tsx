@@ -57,11 +57,7 @@ export function LoginScreen({ navigation }: Props) {
         />
       }
     >
-      <TouchableOpacity
-        accessibilityRole="button"
-        activeOpacity={0.84}
-        style={styles.googleButton}
-      >
+      <TouchableOpacity accessibilityRole="button" activeOpacity={0.84} style={styles.googleButton}>
         <GoogleIcon width={20} height={20} />
         <Text style={styles.googleText}>Entrar com Google</Text>
       </TouchableOpacity>
@@ -74,6 +70,7 @@ export function LoginScreen({ navigation }: Props) {
 
       <ZyraInput
         label="Email"
+        placeholder="Digite seu email"
         value={email}
         onChangeText={setEmail}
         onBlur={() => setEmailTouched(true)}
@@ -86,6 +83,7 @@ export function LoginScreen({ navigation }: Props) {
 
       <ZyraInput
         label="Senha"
+        placeholder="Digite sua senha"
         value={senha}
         onChangeText={setSenha}
         onBlur={() => setSenhaTouched(true)}
@@ -94,11 +92,7 @@ export function LoginScreen({ navigation }: Props) {
         error={erroSenha}
       />
 
-      <TouchableOpacity
-        accessibilityRole="button"
-        activeOpacity={0.8}
-        style={styles.forgotButton}
-      >
+      <TouchableOpacity accessibilityRole="button" activeOpacity={0.8} style={styles.forgotButton}>
         <Text style={styles.forgot}>esqueceu sua senha?</Text>
       </TouchableOpacity>
     </AuthLayout>

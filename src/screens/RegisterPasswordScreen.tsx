@@ -1,6 +1,9 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+
+import EyeClosedIcon from '../../assets/icons/eye-closed.svg';
+import EyeOpenIcon from '../../assets/icons/eye-open.svg';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { AuthLayout } from '../components/AuthLayout';
 import { ZyraButton } from '../components/ZyraButton';
@@ -20,6 +23,8 @@ export function RegisterPasswordScreen({ navigation, route }: Props) {
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [confirmationTouched, setConfirmationTouched] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   const hasValidInternalSpace = /\S\s+\S/.test(password);
   const rules: Rule[] = [
@@ -46,20 +51,35 @@ export function RegisterPasswordScreen({ navigation, route }: Props) {
         <ZyraButton
           title="Continuar"
           disabled={!canContinue}
-          onPress={() => navigation.navigate('RegisterVerification', { firstName: route.params.firstName })}
+          onPress={() =>
+            navigation.navigate('RegisterVerification', {
+              firstName: route.params.firstName,
+            })
+          }
         />
       }
     >
       <ZyraInput
         label="Senha"
+        placeholder="Digite sua senha"
         value={password}
         onChangeText={setPassword}
-        secureTextEntry
+        secureTextEntry={!showPassword}
         autoCapitalize="none"
         autoCorrect={false}
+        rightAccessory={
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+            activeOpacity={0.75}
+            onPress={() => setShowPassword((currentValue) => !currentValue)}
+          >
+            {showPassword ? <EyeOpenIcon width={21} height={21} /> : <EyeClosedIcon width={21} height={21} />}
+          </TouchableOpacity>
+        }
       />
 
-      <View style={styles.validationList} accessible accessibilityLabel="Requisitos da senha">
+      <View style={styles.validationList}>
         {rules.map((rule) => (
           <View key={rule.label} style={styles.ruleRow}>
             <Text style={[styles.ruleIcon, rule.isValid && styles.ruleValid]}>
@@ -71,14 +91,25 @@ export function RegisterPasswordScreen({ navigation, route }: Props) {
       </View>
 
       <ZyraInput
-        label="Confirmar Senha"
+        label="Confirmar senha"
+        placeholder="Digite a senha novamente"
         value={confirmation}
         onChangeText={setConfirmation}
         onBlur={() => setConfirmationTouched(true)}
-        secureTextEntry
+        secureTextEntry={!showConfirmation}
         autoCapitalize="none"
         autoCorrect={false}
         error={confirmationTouched && !passwordsMatch ? 'As senhas precisam ser iguais.' : undefined}
+        rightAccessory={
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={showConfirmation ? 'Ocultar confirmação de senha' : 'Mostrar confirmação de senha'}
+            activeOpacity={0.75}
+            onPress={() => setShowConfirmation((currentValue) => !currentValue)}
+          >
+            {showConfirmation ? <EyeOpenIcon width={21} height={21} /> : <EyeClosedIcon width={21} height={21} />}
+          </TouchableOpacity>
+        }
       />
     </AuthLayout>
   );

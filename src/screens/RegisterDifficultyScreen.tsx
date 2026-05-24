@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { AuthLayout } from '../components/AuthLayout';
 import { ZyraButton } from '../components/ZyraButton';
 import { theme } from '../styles/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterDifficulty'>;
+
 const numbers = [0, 1, 2, 3, 4, 5];
 
 export function RegisterDifficultyScreen({ navigation }: Props) {
@@ -17,49 +19,39 @@ export function RegisterDifficultyScreen({ navigation }: Props) {
       title=""
       onBack={() => navigation.goBack()}
       footer={
-        <View>
-          <Text
-            onPress={() => navigation.navigate('Login')}
-            style={styles.skip}
+        <>
+          <TouchableOpacity
+            accessibilityRole="button"
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('Intro')}
           >
-            Prefiro não dizer
-          </Text>
+            <Text style={styles.skip}>Prefiro não dizer</Text>
+          </TouchableOpacity>
           <ZyraButton
             title="Continuar"
             disabled={selected === null}
-            onPress={() => navigation.navigate('Login')}
+            onPress={() => navigation.navigate('Intro')}
           />
-        </View>
+        </>
       }
     >
-      <Text style={styles.question}>
-        Quanta dificuldade você sente ao combinar roupas?
-      </Text>
-      <Text style={styles.helper}>
-        Isso permitirá entender melhor{`\n`}nosso público!
-      </Text>
+      <Text style={styles.question}>Quanta dificuldade você sente ao combinar roupas?</Text>
+      <Text style={styles.helper}>Isso permitirá entender melhor{`\n`}nosso público!</Text>
+
       <View style={styles.scale}>
         {numbers.map((number) => (
           <TouchableOpacity
             key={number}
-            activeOpacity={0.85}
+            accessibilityRole="button"
+            activeOpacity={0.82}
             onPress={() => setSelected(number)}
-            style={[
-              styles.circle,
-              selected === number && styles.selectedCircle,
-            ]}
+            style={[styles.circle, selected === number && styles.selectedCircle]}
           >
-            <Text
-              style={[
-                styles.number,
-                selected === number && styles.selectedNumber,
-              ]}
-            >
-              {number}
-            </Text>
+            <Text style={[styles.number, selected === number && styles.selectedNumber]}>{number}</Text>
           </TouchableOpacity>
         ))}
       </View>
+
       <View style={styles.captionRow}>
         <Text style={styles.caption}>Nenhuma dificuldade</Text>
         <Text style={styles.caption}>Muita dificuldade</Text>
@@ -80,7 +72,7 @@ const styles = StyleSheet.create({
   helper: {
     color: theme.colors.titleZyra,
     fontFamily: theme.fonts.regular,
-    fontSize: 14,
+    fontSize: 12,
     lineHeight: 20,
     textAlign: 'center',
     marginTop: 4,
@@ -105,15 +97,27 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
-  selectedCircle: { backgroundColor: theme.colors.primary },
-  number: { color: theme.colors.text, fontSize: 13, fontWeight: '800' },
-  selectedNumber: { color: theme.colors.white },
+  selectedCircle: {
+    backgroundColor: theme.colors.primary,
+  },
+  number: {
+    color: theme.colors.text,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  selectedNumber: {
+    color: theme.colors.white,
+  },
   captionRow: {
     marginTop: 22,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  caption: { fontSize: 11, color: theme.colors.titleZyra, fontFamily: theme.fonts.regular },
+  caption: {
+    fontSize: 11,
+    color: theme.colors.titleZyra,
+    fontFamily: theme.fonts.regular,
+  },
   skip: {
     color: theme.colors.label,
     fontFamily: theme.fonts.semiBold,

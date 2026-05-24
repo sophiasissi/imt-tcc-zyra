@@ -1,21 +1,27 @@
+import type { ReactNode } from 'react';
 import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
+
 import { theme } from '../styles/theme';
 
 type Props = TextInputProps & {
   label: string;
   error?: string;
+  rightAccessory?: ReactNode;
 };
 
-export function ZyraInput({ label, error, style, ...props }: Props) {
+export function ZyraInput({ label, error, rightAccessory, style, ...props }: Props) {
   return (
     <View style={styles.wrapper}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput
-        accessibilityLabel={label}
-        placeholderTextColor="#929292"
-        style={[styles.input, style]}
-        {...props}
-      />
+      <View style={styles.inputContainer}>
+        <TextInput
+          accessibilityLabel={label}
+          placeholderTextColor={theme.colors.inputText}
+          style={[styles.input, rightAccessory ? styles.inputWithAccessory : undefined, style]}
+          {...props}
+        />
+        {rightAccessory ? <View style={styles.rightAccessory}>{rightAccessory}</View> : null}
+      </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
   );
@@ -54,5 +60,18 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
     fontFamily: theme.fonts.medium,
     fontSize: 12,
+  },
+  inputContainer: {
+    position: 'relative',
+  },
+  inputWithAccessory: {
+    paddingRight: 50,
+  },
+  rightAccessory: {
+    position: 'absolute',
+    right: 16,
+    height: 54,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
