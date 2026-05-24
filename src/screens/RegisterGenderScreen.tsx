@@ -8,7 +8,6 @@ import { ZyraButton } from '../components/ZyraButton';
 import { theme } from '../styles/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterGender'>;
-
 const options = ['Masculino', 'Feminino', 'Não Binário'];
 
 export function RegisterGenderScreen({ navigation }: Props) {
@@ -20,13 +19,19 @@ export function RegisterGenderScreen({ navigation }: Props) {
       onBack={() => navigation.goBack()}
       footer={
         <View>
-          <Text onPress={() => navigation.navigate('RegisterColorBlindness')} style={styles.skip}>Prefiro não dizer</Text>
-          <ZyraButton title="Continuar" onPress={() => navigation.navigate('RegisterColorBlindness')} />
+          <Text onPress={() => navigation.navigate('RegisterColorBlindness')} style={styles.skip}>
+            Prefiro não dizer
+          </Text>
+          <ZyraButton
+            title="Continuar"
+            disabled={selected === null}
+            onPress={() => navigation.navigate('RegisterColorBlindness')}
+          />
         </View>
       }
     >
       <Text style={styles.question}>Como você se identifica?</Text>
-      <Text style={styles.helper}>Isso permitirá entender melhor nosso público!</Text>
+      <Text style={styles.helper}>Isso permitirá entender melhor{`\n`}nosso público!</Text>
       <View style={styles.options}>
         {options.map((option) => (
           <OptionPill key={option} label={option} selected={selected === option} onPress={() => setSelected(option)} />
@@ -38,30 +43,37 @@ export function RegisterGenderScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   question: {
+    marginTop: 200,
+    color: theme.colors.titleZyra,
+    fontFamily: theme.fonts.semiBold,
+    fontSize: 20,
     textAlign: 'center',
-    fontSize: 17,
-    fontWeight: '900',
-    color: theme.colors.text,
   },
   helper: {
+    color: theme.colors.titleZyra,
+    fontFamily: theme.fonts.regular,
+    fontSize: 12,
+    lineHeight: 20,
     textAlign: 'center',
     marginTop: 4,
-    marginBottom: 24,
-    fontSize: 11,
-    lineHeight: 15,
-    color: theme.colors.text,
+    marginBottom: 15,
   },
   options: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
     gap: 16,
+    shadowColor: '#000000',
+    shadowOffset: { width: 2, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
   },
   skip: {
+    color: theme.colors.label,
+    fontFamily: theme.fonts.semiBold,
+    fontSize: 16,
     textAlign: 'center',
-    color: theme.colors.text,
-    fontSize: 12,
-    fontWeight: '800',
-    marginBottom: 18,
+    marginBottom: 20,
   },
 });

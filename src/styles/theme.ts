@@ -2,16 +2,25 @@ export const theme = {
   colors: {
     background: '#FAF9F6',
     primary: '#AB003E',
-    text: '#3B3B3B',
-    muted: '#6B6B6B',
-    input: '#E4E4E4',
-    inputText: '#333333',
+    primaryPressed: '#970037',
+    text: '#2C2C2C',
+    title: '#101010',
+    label: '#3B3B3B',
+    titleZyra: '#000000',
+    muted: '#4D4D4D',
+    muted2: '#5F5F5F',
+    input: '#E1E1E1',
+    inputText: '#464646',
     white: '#FFFFFF',
-    gray: '#4D4D4D',
-    textButton: '#2C2C2C',
+    border: '#D4D4D4',
+    link: '#B90043',
   },
   spacing: {
-    screen: 24,
+    screen: 20,
+  },
+  radius: {
+    input: 10,
+    button: 10,
   },
   fonts: {
     regular: 'PoppinsRegular',
@@ -22,4 +31,4 @@ export const theme = {
     black: 'PoppinsBlack',
     title: 'Jomhuria',
   },
-};
+} as const;

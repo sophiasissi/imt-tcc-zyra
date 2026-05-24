@@ -7,7 +7,6 @@ import { ZyraButton } from '../components/ZyraButton';
 import { theme } from '../styles/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterDifficulty'>;
-
 const numbers = [0, 1, 2, 3, 4, 5];
 
 export function RegisterDifficultyScreen({ navigation }: Props) {
@@ -19,22 +18,45 @@ export function RegisterDifficultyScreen({ navigation }: Props) {
       onBack={() => navigation.goBack()}
       footer={
         <View>
-          <Text style={styles.skip}>Prefiro não dizer</Text>
-          <ZyraButton title="Continuar" onPress={() => navigation.navigate('Login')} />
+          <Text
+            onPress={() => navigation.navigate('Login')}
+            style={styles.skip}
+          >
+            Prefiro não dizer
+          </Text>
+          <ZyraButton
+            title="Continuar"
+            disabled={selected === null}
+            onPress={() => navigation.navigate('Login')}
+          />
         </View>
       }
     >
-      <Text style={styles.question}>Quanta dificuldade você sente ao combinar roupas?</Text>
-      <Text style={styles.helper}>Isso permitirá entender melhor nosso público!</Text>
+      <Text style={styles.question}>
+        Quanta dificuldade você sente ao combinar roupas?
+      </Text>
+      <Text style={styles.helper}>
+        Isso permitirá entender melhor{`\n`}nosso público!
+      </Text>
       <View style={styles.scale}>
         {numbers.map((number) => (
           <TouchableOpacity
             key={number}
             activeOpacity={0.85}
             onPress={() => setSelected(number)}
-            style={[styles.circle, selected === number && styles.selectedCircle]}
+            style={[
+              styles.circle,
+              selected === number && styles.selectedCircle,
+            ]}
           >
-            <Text style={[styles.number, selected === number && styles.selectedNumber]}>{number}</Text>
+            <Text
+              style={[
+                styles.number,
+                selected === number && styles.selectedNumber,
+              ]}
+            >
+              {number}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -48,20 +70,21 @@ export function RegisterDifficultyScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   question: {
+    marginTop: 200,
+    color: theme.colors.titleZyra,
+    fontFamily: theme.fonts.semiBold,
+    fontSize: 20,
+    lineHeight: 29,
     textAlign: 'center',
-    fontSize: 17,
-    lineHeight: 22,
-    fontWeight: '900',
-    color: theme.colors.text,
-    paddingHorizontal: 10,
   },
   helper: {
+    color: theme.colors.titleZyra,
+    fontFamily: theme.fonts.regular,
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: 'center',
-    marginTop: 6,
+    marginTop: 4,
     marginBottom: 24,
-    fontSize: 11,
-    lineHeight: 15,
-    color: theme.colors.text,
   },
   scale: {
     flexDirection: 'row',
@@ -70,39 +93,32 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   circle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: theme.colors.input,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 2, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  selectedCircle: {
-    backgroundColor: theme.colors.primary,
-  },
-  number: {
-    color: theme.colors.text,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  selectedNumber: {
-    color: theme.colors.white,
-  },
+  selectedCircle: { backgroundColor: theme.colors.primary },
+  number: { color: theme.colors.text, fontSize: 13, fontWeight: '800' },
+  selectedNumber: { color: theme.colors.white },
   captionRow: {
     marginTop: 22,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  caption: {
-    fontSize: 9,
-    color: theme.colors.text,
-    fontWeight: '700',
-  },
+  caption: { fontSize: 11, color: theme.colors.titleZyra, fontFamily: theme.fonts.regular },
   skip: {
+    color: theme.colors.label,
+    fontFamily: theme.fonts.semiBold,
+    fontSize: 16,
     textAlign: 'center',
-    color: theme.colors.text,
-    fontSize: 12,
-    fontWeight: '800',
-    marginBottom: 18,
+    marginBottom: 20,
   },
 });

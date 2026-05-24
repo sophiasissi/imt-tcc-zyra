@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { StyleSheet } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { AuthLayout } from '../components/AuthLayout';
@@ -6,14 +8,60 @@ import { ZyraInput } from '../components/ZyraInput';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterBasicInfo'>;
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 export function RegisterBasicInfoScreen({ navigation }: Props) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [nameTouched, setNameTouched] = useState(false);
+  const [emailTouched, setEmailTouched] = useState(false);
+
+  const trimmedName = name.trim();
+  const nameIsValid = trimmedName.length > 0;
+  const emailIsValid = EMAIL_PATTERN.test(email.trim());
+  const firstName = trimmedName.split(/\s+/)[0];
+  const canContinue = nameIsValid && emailIsValid;
+
   return (
     <AuthLayout
+      title="Crie uma conta"
       onBack={() => navigation.goBack()}
-      footer={<ZyraButton title="Continuar" onPress={() => navigation.navigate('RegisterPassword')} />}
+      contentStyle={styles.content}
+      footer={
+        <ZyraButton
+          title="Continuar"
+          disabled={!canContinue}
+          onPress={() => navigation.navigate('RegisterPassword', { firstName })}
+        />
+      }
     >
-      <ZyraInput label="Nome" autoCapitalize="words" />
-      <ZyraInput label="Email" keyboardType="email-address" />
+      <ZyraInput
+        label="Nome"
+        value={name}
+        onChangeText={setName}
+        onBlur={() => setNameTouched(true)}
+        autoCapitalize="words"
+        autoCorrect={false}
+        returnKeyType="next"
+        error={nameTouched && !nameIsValid ? 'O nome é obrigatório.' : undefined}
+      />
+      <ZyraInput
+        label="Email"
+        value={email}
+        onChangeText={setEmail}
+        onBlur={() => setEmailTouched(true)}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="done"
+        error={emailTouched && !emailIsValid ? 'Digite um e-mail válido, como nome@email.com.' : undefined}
+      />
     </AuthLayout>
   );
 }
+
+const styles = StyleSheet.create({
+  content: {
+    marginTop: 150,
+  },
+});

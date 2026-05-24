@@ -1,10 +1,11 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { theme } from '../styles/theme';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
-import YellowTshirt from '../../assets/images/yellowTshirt.svg';
 import BlueSkirt from '../../assets/images/blueSkirt.svg';
 import PinkPants from '../../assets/images/pinkPants.svg';
+import YellowTshirt from '../../assets/images/yellowTshirt.svg';
+import { RootStackParamList } from '../navigation/AppNavigator';
+import { theme } from '../styles/theme';
+import { ZyraButton } from '../components/ZyraButton';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Intro'>;
 
@@ -17,20 +18,19 @@ export function IntroScreen({ navigation }: Props) {
 
       <Text style={styles.logo}>ZYRA</Text>
 
-      <Text style={styles.subtitle}>
-        Monte looks com confiança, todos os dias
-      </Text>
-
-      <TouchableOpacity
-        style={styles.primaryButton}
-        onPress={() => navigation.navigate('RegisterStart')}
-      >
-        <Text style={styles.primaryButtonText}>Começar agora</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-        <Text style={styles.loginText}>Entrar</Text>
-      </TouchableOpacity>
+      <View style={styles.actions}>
+        <Text style={styles.subtitle}>Monte looks com confiança, todos os dias</Text>
+        <ZyraButton title="Começar agora" onPress={() => navigation.navigate('RegisterStart')} />
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Entrar"
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('Login')}
+          style={styles.loginButton}
+        >
+          <Text style={styles.loginText}>Entrar</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -38,63 +38,62 @@ export function IntroScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAF9F6',
+    backgroundColor: theme.colors.background,
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingHorizontal: 24,
-    paddingBottom: 56,
-  },
-  logo: {
-    position: 'absolute',
-    top: '38%',
-    fontSize: 128,
-    fontFamily: theme.fonts.title,
-    color: '#000000',
-  },
-  subtitle: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 16,
-    textAlign: 'center',
-    color: '#000000',
-    marginBottom: 42,
-    width: 315,
-  },
-  primaryButton: {
-    width: '100%',
-    height: 56,
-    backgroundColor: '#AB003E',
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 6,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontFamily: theme.fonts.bold,
-    fontSize: 16,
-  },
-  loginText: {
-    color: '#000000',
-    fontFamily: theme.fonts.bold,
-    fontSize: 18,
   },
   yellowTshirt: {
     position: 'absolute',
     top: 0,
+    right: 120,
   },
   blueSkirt: {
     position: 'absolute',
+    top: 350,
     left: 0,
-    top: 320,
   },
   pinkPants: {
     position: 'absolute',
+    top: 420,
     right: 0,
-    top: 380,
+  },
+  logo: {
+    position: 'absolute',
+    top: '39%',
+    color: theme.colors.titleZyra,
+    fontFamily: theme.fonts.title,
+    fontSize: 128,
+    lineHeight: 112,
+  },
+  actions: {
+    position: 'absolute',
+    left: theme.spacing.screen,
+    right: theme.spacing.screen,
+    bottom: 40,
+    alignItems: 'center',
+  },
+  subtitle: {
+    marginBottom: 39,
+    color: theme.colors.title,
+    fontFamily: theme.fonts.medium,
+    fontSize: 18,
+    lineHeight: 29,
+    textAlign: 'center',
+    width: 280,
+  },
+  loginButton: {
+    height: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 2, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  loginText: {
+    color: theme.colors.titleZyra,
+    fontFamily: theme.fonts.bold,
+    fontSize: 20,
+    marginTop: 10,
   },
 });
