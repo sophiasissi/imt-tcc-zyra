@@ -1,16 +1,19 @@
 import { ReactNode } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
+  ScrollView,
   StyleProp,
   StyleSheet,
   Text,
+  TextStyle,
   TouchableOpacity,
   View,
   ViewStyle,
-  TextStyle,
 } from 'react-native';
+
 import BackArrowIcon from '../../assets/icons/backArrow.svg';
 import { ZyraButton } from './ZyraButton';
 import { theme } from '../styles/theme';
@@ -45,9 +48,8 @@ export function AuthLayout({
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
         style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         {showHeader ? (
           <View style={styles.header}>
@@ -56,8 +58,8 @@ export function AuthLayout({
                 accessibilityRole="button"
                 accessibilityLabel="Voltar"
                 activeOpacity={0.8}
-                onPress={onBack}
                 style={styles.backButton}
+                onPress={onBack}
               >
                 <BackArrowIcon width={26} height={26} />
               </TouchableOpacity>
@@ -66,13 +68,26 @@ export function AuthLayout({
           </View>
         ) : null}
 
-        <View style={[styles.content, !showHeader && styles.contentNoHeader, contentStyle]}>{children}</View>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[
+            styles.content,
+            !showHeader && styles.contentNoHeader,
+            contentStyle,
+          ]}
+          keyboardShouldPersistTaps="never"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          onScrollBeginDrag={Keyboard.dismiss}
+          showsVerticalScrollIndicator={false}
+        >
+          {children}
+        </ScrollView>
 
         {hasDefaultFooterButton ? (
           <View style={styles.footer}>
             <ZyraButton
-              title={footerButtonTitle as string}
-              onPress={onFooterButtonPress as () => void}
+              title={footerButtonTitle!}
+              onPress={onFooterButtonPress ?? (() => undefined)}
               disabled={footerButtonDisabled}
             />
           </View>
@@ -115,8 +130,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     textAlign: 'center',
   },
-  content: {
+  scroll: {
     flex: 1,
+  },
+  content: {
+    flexGrow: 1,
     paddingTop: 22,
     paddingLeft: 26,
     paddingRight: theme.spacing.screen,

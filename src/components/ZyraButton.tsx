@@ -27,7 +27,7 @@ export function ZyraButton({ title, onPress, style, disabled = false }: Props) {
 const styles = StyleSheet.create({
   button: {
     width: '100%',
-    height: 56,
+    height: 54,
     borderRadius: theme.radius.button,
     backgroundColor: theme.colors.primary,
     alignItems: 'center',

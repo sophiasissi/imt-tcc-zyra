@@ -74,8 +74,8 @@ const styles = StyleSheet.create({
   subtitle: {
     marginBottom: 39,
     color: theme.colors.title,
-    fontFamily: theme.fonts.regular,
-    fontSize: 20,
+    fontFamily: theme.fonts.medium,
+    fontSize: 18,
     lineHeight: 29,
     textAlign: 'center',
     width: 280,

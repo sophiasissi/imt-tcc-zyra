@@ -25,7 +25,7 @@ export function RegisterStartScreen({ navigation }: Props) {
         accessibilityRole="button"
         activeOpacity={0.84}
         style={styles.secondaryButton}
-        onPress={() => navigation.navigate('RegisterWelcome', { username: 'username' })}
+        onPress={() => navigation.navigate('RegisterWelcome', { firstName: 'username' })}
       >
         <GoogleIcon width={20} height={20} />
         <Text style={styles.secondaryText}>Começar com Google</Text>
@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     width: '100%',
-    height: 56,
+    height: 54,
     marginBottom: 18,
     borderRadius: 10,
     backgroundColor: theme.colors.input,

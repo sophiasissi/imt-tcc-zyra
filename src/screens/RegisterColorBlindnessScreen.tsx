@@ -1,15 +1,22 @@
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-
-import DownArrow from '../../assets/icons/downArrow.svg';
+import { RootStackParamList } from '../navigation/AppNavigator';
 import { AuthLayout } from '../components/AuthLayout';
 import { ZyraButton } from '../components/ZyraButton';
-import { RootStackParamList } from '../navigation/AppNavigator';
 import { theme } from '../styles/theme';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'RegisterColorBlindness'>;
-
+type Props = NativeStackScreenProps<
+  RootStackParamList,
+  'RegisterColorBlindness'
+>;
 const options = [
   'Protanomalia',
   'Protanopia',
@@ -18,58 +25,66 @@ const options = [
   'Tritanomalia',
   'Tritanopia',
   'Acromatopsia',
-  'Não Sei',
+  'Não sei',
 ];
 
 export function RegisterColorBlindnessScreen({ navigation }: Props) {
-  const [selected, setSelected] = useState('Protanomalia');
+  const [selected, setSelected] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
 
-  const choose = (option: string) => {
+  function choose(option: string) {
     setSelected(option);
     setOpen(false);
-  };
+  }
 
   return (
     <AuthLayout
+      title=""
       onBack={() => navigation.goBack()}
-      contentStyle={styles.content}
       footer={
         <View>
-          <TouchableOpacity
-            accessibilityRole="button"
-            activeOpacity={0.8}
+          <Text
             onPress={() => navigation.navigate('RegisterDifficulty')}
+            style={styles.skip}
           >
-            <Text style={styles.skip}>Não tenho!</Text>
-          </TouchableOpacity>
-          <ZyraButton title="Continuar" onPress={() => navigation.navigate('RegisterDifficulty')} />
+            Não tenho!
+          </Text>
+          <ZyraButton
+            title="Continuar"
+            disabled={selected === null}
+            onPress={() => navigation.navigate('RegisterDifficulty')}
+          />
         </View>
       }
     >
       <Text style={styles.question}>Qual tipo de daltonismo você tem?</Text>
-      <Text style={styles.helper}>Isso permitirá entender melhor{`\n`}nosso público!</Text>
-
+      <Text style={styles.helper}>
+        Isso permitirá entender melhor{`\n`}nosso público!
+      </Text>
       <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel="Selecionar tipo de daltonismo"
         activeOpacity={0.85}
         style={styles.select}
         onPress={() => setOpen(true)}
       >
-        <Text style={styles.selectText}>{selected}</Text>
-        <DownArrow width={30} height={30} />
+        <Text style={styles.selectText}>
+          {selected ?? 'Selecione uma opção'}
+        </Text>
+        <Text style={styles.chevron}>⌄</Text>
       </TouchableOpacity>
-
-      <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
+      <Modal
+        transparent
+        visible={open}
+        animationType="fade"
+        onRequestClose={() => setOpen(false)}
+      >
         <Pressable style={styles.overlay} onPress={() => setOpen(false)}>
           <View style={styles.modalCard}>
-            <View style={styles.selectedOption}>
-              <Text style={styles.selectedOptionText}>{selected}</Text>
-              <DownArrow width={30} height={30} />
-            </View>
-            {options.filter((option) => option !== selected).map((option) => (
-              <TouchableOpacity key={option} activeOpacity={0.8} onPress={() => choose(option)} style={styles.modalOption}>
+            {options.map((option) => (
+              <TouchableOpacity
+                key={option}
+                style={styles.modalOption}
+                onPress={() => choose(option)}
+              >
                 <Text style={styles.modalText}>{option}</Text>
               </TouchableOpacity>
             ))}
@@ -81,11 +96,8 @@ export function RegisterColorBlindnessScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  content: {
-    justifyContent: 'center',
-    paddingBottom: 113,
-  },
   question: {
+    marginTop: 200,
     color: theme.colors.titleZyra,
     fontFamily: theme.fonts.semiBold,
     fontSize: 20,
@@ -94,15 +106,15 @@ const styles = StyleSheet.create({
   helper: {
     color: theme.colors.titleZyra,
     fontFamily: theme.fonts.regular,
-    fontSize: 14,
+    fontSize: 12,
     lineHeight: 20,
     textAlign: 'center',
     marginTop: 4,
-    marginBottom: 14,
+    marginBottom: 15,
   },
   select: {
-    height: 56,
-    borderRadius: 10,
+    height: 54,
+    borderRadius: 8,
     backgroundColor: theme.colors.input,
     paddingHorizontal: 18,
     flexDirection: 'row',
@@ -129,39 +141,21 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.25)',
     justifyContent: 'center',
-    paddingHorizontal: 20,
-    backgroundColor: 'rgba(0,0,0,0.15)',
+    paddingHorizontal: 28,
   },
   modalCard: {
-    backgroundColor: theme.colors.input,
-    borderRadius: 9,
+    borderRadius: 14,
+    backgroundColor: theme.colors.background,
     overflow: 'hidden',
   },
-  selectedOption: {
-    height: 53,
+   chevron: { fontSize: 24, color: theme.colors.text, marginTop: -8 },
+  modalOption: {
+    paddingVertical: 15,
     paddingHorizontal: 18,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#333',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    borderBottomColor: '#CCC',
   },
-  selectedOptionText: {
-    flex: 1,
-    color: theme.colors.label,
-    fontFamily: theme.fonts.semiBold,
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  modalOption: {
-    height: 45,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalText: {
-    color: theme.colors.label,
-    fontFamily: theme.fonts.semiBold,
-    fontSize: 16,
-  },
+  modalText: { fontSize: 15, fontWeight: '700', color: theme.colors.text },
 });

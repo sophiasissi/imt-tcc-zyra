@@ -1,6 +1,5 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-
 import { IntroScreen } from '../screens/IntroScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { RegisterBasicInfoScreen } from '../screens/RegisterBasicInfoScreen';
@@ -17,9 +16,9 @@ export type RootStackParamList = {
   Intro: undefined;
   RegisterStart: undefined;
   RegisterBasicInfo: undefined;
-  RegisterPassword: undefined;
-  RegisterVerification: undefined;
-  RegisterWelcome: { username?: string } | undefined;
+  RegisterPassword: { firstName: string };
+  RegisterVerification: { firstName: string };
+  RegisterWelcome: { firstName: string };
   RegisterBirthDate: undefined;
   RegisterGender: undefined;
   RegisterColorBlindness: undefined;

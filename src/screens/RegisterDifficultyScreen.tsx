@@ -1,61 +1,76 @@
 import { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
 import { AuthLayout } from '../components/AuthLayout';
 import { ZyraButton } from '../components/ZyraButton';
-import { RootStackParamList } from '../navigation/AppNavigator';
 import { theme } from '../styles/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterDifficulty'>;
-const scores = [0, 1, 2, 3, 4, 5];
+const numbers = [0, 1, 2, 3, 4, 5];
 
 export function RegisterDifficultyScreen({ navigation }: Props) {
-  const [selected, setSelected] = useState<number>();
+  const [selected, setSelected] = useState<number | null>(null);
 
   return (
     <AuthLayout
+      title=""
       onBack={() => navigation.goBack()}
-      contentStyle={styles.content}
       footer={
         <View>
-          <TouchableOpacity accessibilityRole="button" activeOpacity={0.8}>
-            <Text style={styles.skip}>Prefiro não dizer</Text>
-          </TouchableOpacity>
-          <ZyraButton title="Continuar" onPress={() => {}} />
+          <Text
+            onPress={() => navigation.navigate('Login')}
+            style={styles.skip}
+          >
+            Prefiro não dizer
+          </Text>
+          <ZyraButton
+            title="Continuar"
+            disabled={selected === null}
+            onPress={() => navigation.navigate('Login')}
+          />
         </View>
       }
     >
-      <Text style={styles.question}>Quanta dificuldade você{`\n`}sente ao combinar roupas?</Text>
-      <Text style={styles.helper}>Isso permitirá entender melhor{`\n`}nosso público!</Text>
+      <Text style={styles.question}>
+        Quanta dificuldade você sente ao combinar roupas?
+      </Text>
+      <Text style={styles.helper}>
+        Isso permitirá entender melhor{`\n`}nosso público!
+      </Text>
       <View style={styles.scale}>
-        {scores.map((score) => (
+        {numbers.map((number) => (
           <TouchableOpacity
-            key={score}
-            accessibilityRole="button"
-            accessibilityState={{ selected: selected === score }}
-            activeOpacity={0.8}
-            onPress={() => setSelected(score)}
-            style={[styles.circle, selected === score && styles.selectedCircle]}
+            key={number}
+            activeOpacity={0.85}
+            onPress={() => setSelected(number)}
+            style={[
+              styles.circle,
+              selected === number && styles.selectedCircle,
+            ]}
           >
-            <Text style={[styles.circleText, selected === score && styles.selectedCircleText]}>{score}</Text>
+            <Text
+              style={[
+                styles.number,
+                selected === number && styles.selectedNumber,
+              ]}
+            >
+              {number}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
-      <View style={styles.legend}>
-        <Text style={styles.legendText}>Nenhuma dificuldade</Text>
-        <Text style={styles.legendText}>-</Text>
-        <Text style={styles.legendText}>Muita dificuldade</Text>
+      <View style={styles.captionRow}>
+        <Text style={styles.caption}>Nenhuma dificuldade</Text>
+        <Text style={styles.caption}>Muita dificuldade</Text>
       </View>
     </AuthLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    justifyContent: 'center',
-    paddingBottom: 100,
-  },
   question: {
+    marginTop: 200,
     color: theme.colors.titleZyra,
     fontFamily: theme.fonts.semiBold,
     fontSize: 20,
@@ -68,14 +83,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',
-    marginTop: 3,
-    marginBottom: 16,
+    marginTop: 4,
+    marginBottom: 24,
   },
   scale: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginHorizontal: 11,
+    marginHorizontal: 8,
   },
   circle: {
     width: 40,
@@ -90,28 +105,15 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
-  selectedCircle: {
-    backgroundColor: theme.colors.primary,
-  },
-  circleText: {
-    color: theme.colors.label,
-    fontFamily: theme.fonts.semiBold,
-    fontSize: 16,
-  },
-  selectedCircleText: {
-    color: theme.colors.white,
-  },
-  legend: {
+  selectedCircle: { backgroundColor: theme.colors.primary },
+  number: { color: theme.colors.text, fontSize: 13, fontWeight: '800' },
+  selectedNumber: { color: theme.colors.white },
+  captionRow: {
+    marginTop: 22,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 17,
-    marginHorizontal: 7,
   },
-  legendText: {
-    color: theme.colors.titleZyra,
-    fontFamily: theme.fonts.regular,
-    fontSize: 11,
-  },
+  caption: { fontSize: 11, color: theme.colors.titleZyra, fontFamily: theme.fonts.regular },
   skip: {
     color: theme.colors.label,
     fontFamily: theme.fonts.semiBold,

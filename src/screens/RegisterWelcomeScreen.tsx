@@ -1,6 +1,5 @@
 import { StyleSheet, Text } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-
 import LittleGuy from '../../assets/images/littleguy.svg';
 import { AuthLayout } from '../components/AuthLayout';
 import { ZyraButton } from '../components/ZyraButton';
@@ -10,7 +9,7 @@ import { theme } from '../styles/theme';
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterWelcome'>;
 
 export function RegisterWelcomeScreen({ navigation, route }: Props) {
-  const username = route.params?.username ?? 'username';
+  const firstName = route.params.firstName.trim() || 'usuário';
 
   return (
     <AuthLayout
@@ -20,8 +19,10 @@ export function RegisterWelcomeScreen({ navigation, route }: Props) {
     >
       <Text style={styles.logo}>ZYRA</Text>
       <LittleGuy style={styles.character} />
-      <Text style={styles.welcomeText}>Bem vindo(a), &lt;{username}&gt;</Text>
-      <Text style={styles.description}>Textinho legal. Que tal me contar um{`\n`}pouco sobre você?</Text>
+      <Text style={styles.welcomeText}>Bem vindo(a), {firstName}</Text>
+      <Text style={styles.description}>
+        Que tal me contar um pouco sobre você?
+      </Text>
     </AuthLayout>
   );
 }

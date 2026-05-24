@@ -1,12 +1,12 @@
 import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
-
 import { theme } from '../styles/theme';
 
 type Props = TextInputProps & {
   label: string;
+  error?: string;
 };
 
-export function ZyraInput({ label, style, ...props }: Props) {
+export function ZyraInput({ label, error, style, ...props }: Props) {
   return (
     <View style={styles.wrapper}>
       <Text style={styles.label}>{label}</Text>
@@ -16,6 +16,7 @@ export function ZyraInput({ label, style, ...props }: Props) {
         style={[styles.input, style]}
         {...props}
       />
+      {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
   );
 }
@@ -34,7 +35,7 @@ const styles = StyleSheet.create({
   },
   input: {
     width: '100%',
-    height: 56,
+    height: 54,
     paddingHorizontal: 16,
     borderRadius: theme.radius.input,
     backgroundColor: theme.colors.input,
@@ -46,5 +47,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 4,
+  },
+  error: {
+    marginTop: 7,
+    marginLeft: 2,
+    color: theme.colors.primary,
+    fontFamily: theme.fonts.medium,
+    fontSize: 12,
   },
 });
