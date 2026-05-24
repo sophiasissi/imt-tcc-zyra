@@ -1,47 +1,75 @@
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
+
+import DownArrow from '../../assets/icons/downArrow.svg';
 import { AuthLayout } from '../components/AuthLayout';
 import { ZyraButton } from '../components/ZyraButton';
+import { RootStackParamList } from '../navigation/AppNavigator';
 import { theme } from '../styles/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterColorBlindness'>;
 
-const options = ['Protanomalia', 'Protanopia', 'Deuteranomalia', 'Deuteranopia', 'Tritanomalia', 'Tritanopia', 'Acromatopsia', 'Não sei'];
+const options = [
+  'Protanomalia',
+  'Protanopia',
+  'Deuteranomalia',
+  'Deuteranopia',
+  'Tritanomalia',
+  'Tritanopia',
+  'Acromatopsia',
+  'Não Sei',
+];
 
 export function RegisterColorBlindnessScreen({ navigation }: Props) {
   const [selected, setSelected] = useState('Protanomalia');
   const [open, setOpen] = useState(false);
 
-  function choose(option: string) {
+  const choose = (option: string) => {
     setSelected(option);
     setOpen(false);
-  }
+  };
 
   return (
     <AuthLayout
-      title=""
       onBack={() => navigation.goBack()}
+      contentStyle={styles.content}
       footer={
         <View>
-          <Text onPress={() => navigation.navigate('RegisterDifficulty')} style={styles.skip}>Não tenho!</Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('RegisterDifficulty')}
+          >
+            <Text style={styles.skip}>Não tenho!</Text>
+          </TouchableOpacity>
           <ZyraButton title="Continuar" onPress={() => navigation.navigate('RegisterDifficulty')} />
         </View>
       }
     >
       <Text style={styles.question}>Qual tipo de daltonismo você tem?</Text>
-      <Text style={styles.helper}>Isso permitirá entender melhor nosso público!</Text>
-      <TouchableOpacity activeOpacity={0.85} style={styles.select} onPress={() => setOpen(true)}>
+      <Text style={styles.helper}>Isso permitirá entender melhor{`\n`}nosso público!</Text>
+
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Selecionar tipo de daltonismo"
+        activeOpacity={0.85}
+        style={styles.select}
+        onPress={() => setOpen(true)}
+      >
         <Text style={styles.selectText}>{selected}</Text>
-        <Text style={styles.chevron}>⌄</Text>
+        <DownArrow width={30} height={30} />
       </TouchableOpacity>
 
       <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.overlay} onPress={() => setOpen(false)}>
           <View style={styles.modalCard}>
-            {options.map((option) => (
-              <TouchableOpacity key={option} style={styles.modalOption} onPress={() => choose(option)}>
+            <View style={styles.selectedOption}>
+              <Text style={styles.selectedOptionText}>{selected}</Text>
+              <DownArrow width={30} height={30} />
+            </View>
+            {options.filter((option) => option !== selected).map((option) => (
+              <TouchableOpacity key={option} activeOpacity={0.8} onPress={() => choose(option)} style={styles.modalOption}>
                 <Text style={styles.modalText}>{option}</Text>
               </TouchableOpacity>
             ))}
@@ -53,71 +81,87 @@ export function RegisterColorBlindnessScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  content: {
+    justifyContent: 'center',
+    paddingBottom: 113,
+  },
   question: {
+    color: theme.colors.titleZyra,
+    fontFamily: theme.fonts.semiBold,
+    fontSize: 20,
     textAlign: 'center',
-    fontSize: 17,
-    fontWeight: '900',
-    color: theme.colors.text,
   },
   helper: {
+    color: theme.colors.titleZyra,
+    fontFamily: theme.fonts.regular,
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: 'center',
     marginTop: 4,
-    marginBottom: 24,
-    fontSize: 11,
-    lineHeight: 15,
-    color: theme.colors.text,
+    marginBottom: 14,
   },
   select: {
-    height: 54,
-    borderRadius: 8,
+    height: 56,
+    borderRadius: 10,
     backgroundColor: theme.colors.input,
     paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOpacity: 0.14,
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#000000',
+    shadowOffset: { width: 2, height: 4 },
+    shadowOpacity: 0.25,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 4,
+    textAlign: 'center',
   },
   selectText: {
-    color: theme.colors.text,
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  chevron: {
-    fontSize: 24,
-    color: theme.colors.text,
-    marginTop: -8,
+    color: theme.colors.label,
+    fontFamily: theme.fonts.semiBold,
+    fontSize: 16,
   },
   skip: {
+    color: theme.colors.label,
+    fontFamily: theme.fonts.semiBold,
+    fontSize: 16,
     textAlign: 'center',
-    color: theme.colors.text,
-    fontSize: 12,
-    fontWeight: '800',
-    marginBottom: 18,
+    marginBottom: 20,
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.25)',
     justifyContent: 'center',
-    paddingHorizontal: 28,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(0,0,0,0.15)',
   },
   modalCard: {
-    borderRadius: 14,
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.input,
+    borderRadius: 9,
     overflow: 'hidden',
   },
-  modalOption: {
-    paddingVertical: 15,
+  selectedOption: {
+    height: 53,
     paddingHorizontal: 18,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#CCC',
+    borderBottomColor: '#333',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  selectedOptionText: {
+    flex: 1,
+    color: theme.colors.label,
+    fontFamily: theme.fonts.semiBold,
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  modalOption: {
+    height: 45,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: theme.colors.text,
+    color: theme.colors.label,
+    fontFamily: theme.fonts.semiBold,
+    fontSize: 16,
   },
 });

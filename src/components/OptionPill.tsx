@@ -1,15 +1,23 @@
-import { Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { StyleProp, StyleSheet, Text, TouchableOpacity, ViewStyle } from 'react-native';
+
 import { theme } from '../styles/theme';
 
 type Props = {
   label: string;
   selected?: boolean;
   onPress: () => void;
+  style?: StyleProp<ViewStyle>;
 };
 
-export function OptionPill({ label, selected, onPress }: Props) {
+export function OptionPill({ label, selected = false, onPress, style }: Props) {
   return (
-    <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={[styles.pill, selected && styles.selected]}>
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      activeOpacity={0.84}
+      onPress={onPress}
+      style={[styles.pill, style, selected && styles.selected]}
+    >
       <Text style={[styles.text, selected && styles.selectedText]}>{label}</Text>
     </TouchableOpacity>
   );
@@ -17,26 +25,25 @@ export function OptionPill({ label, selected, onPress }: Props) {
 
 const styles = StyleSheet.create({
   pill: {
-    minHeight: 42,
-    minWidth: 96,
-    paddingHorizontal: 18,
-    borderRadius: 8,
+    minHeight: 47,
+    paddingHorizontal: 17,
+    borderRadius: 10,
     backgroundColor: theme.colors.input,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 3,
-    elevation: 3,
+    shadowColor: '#000000',
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 2, height: 4 },
+    shadowRadius: 4,
+    elevation: 4,
   },
   selected: {
     backgroundColor: theme.colors.primary,
   },
   text: {
-    color: theme.colors.text,
-    fontSize: 13,
-    fontWeight: '800',
+    color: theme.colors.label,
+    fontFamily: theme.fonts.semiBold,
+    fontSize: 16,
   },
   selectedText: {
     color: theme.colors.white,

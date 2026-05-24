@@ -1,67 +1,128 @@
 import { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  StyleProp,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  ViewStyle,
+  TextStyle,
+} from 'react-native';
+import BackArrowIcon from '../../assets/icons/backArrow.svg';
+import { ZyraButton } from './ZyraButton';
 import { theme } from '../styles/theme';
-import BackIcon from '../../assets/icons/back-svgrepo-com.svg';
 
 type Props = {
   title?: string;
   children: ReactNode;
   footer?: ReactNode;
+  showHeader?: boolean;
+  footerButtonTitle?: string;
+  onFooterButtonPress?: () => void;
+  footerButtonDisabled?: boolean;
   onBack?: () => void;
+  contentStyle?: StyleProp<ViewStyle>;
+  titleStyle?: StyleProp<TextStyle>;
 };
 
-export function AuthLayout({ title = 'Crie uma conta', children, footer, onBack }: Props) {
+export function AuthLayout({
+  title,
+  children,
+  footer,
+  footerButtonTitle,
+  onFooterButtonPress,
+  footerButtonDisabled = false,
+  showHeader = true,
+  onBack,
+  contentStyle,
+  titleStyle,
+}: Props) {
+  const hasDefaultFooterButton = Boolean(footerButtonTitle && onFooterButtonPress);
+
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
-      {onBack && (
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="Voltar"
-          onPress={onBack}
-          activeOpacity={0.8}
-          style={styles.backButton}
-        >
-          <BackIcon width={32} height={32} style={styles.backIcon} />
-        </TouchableOpacity>
-      )}
-      <Text style={styles.title}>{title}</Text>
-      <View style={styles.content}>{children}</View>
-      {footer && <View style={styles.footer}>{footer}</View>}
-    </KeyboardAvoidingView>
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+        style={styles.container}
+      >
+        {showHeader ? (
+          <View style={styles.header}>
+            {onBack ? (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Voltar"
+                activeOpacity={0.8}
+                onPress={onBack}
+                style={styles.backButton}
+              >
+                <BackArrowIcon width={26} height={26} />
+              </TouchableOpacity>
+            ) : null}
+            {title ? <Text style={[styles.title, titleStyle]}>{title}</Text> : null}
+          </View>
+        ) : null}
+
+        <View style={[styles.content, !showHeader && styles.contentNoHeader, contentStyle]}>{children}</View>
+
+        {hasDefaultFooterButton ? (
+          <View style={styles.footer}>
+            <ZyraButton
+              title={footerButtonTitle as string}
+              onPress={onFooterButtonPress as () => void}
+              disabled={footerButtonDisabled}
+            />
+          </View>
+        ) : footer ? (
+          <View style={styles.footer}>{footer}</View>
+        ) : null}
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
-    paddingTop: 54,
+  },
+  header: {
+    minHeight: 80,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   backButton: {
     position: 'absolute',
-    top: 48,
     left: 18,
-    width: 44,
-    height: 44,
-    alignItems: 'center',
+    top: 14,
+    width: 42,
+    height: 42,
+    alignItems: 'flex-start',
     justifyContent: 'center',
-    zIndex: 10,
-  },
-  backIcon: {
-    width: 16,
-    height: 16,
+    zIndex: 2,
   },
   title: {
+    color: theme.colors.label,
+    fontFamily: theme.fonts.semiBold,
+    fontSize: 20,
     textAlign: 'center',
-    color: theme.colors.text,
-    fontSize: 17,
-    fontWeight: '800',
-    marginTop: 8,
   },
   content: {
     flex: 1,
-    paddingHorizontal: theme.spacing.screen,
-    justifyContent: 'center',
+    paddingTop: 22,
+    paddingLeft: 26,
+    paddingRight: theme.spacing.screen,
+  },
+  contentNoHeader: {
+    paddingTop: 0,
   },
   footer: {
     paddingHorizontal: theme.spacing.screen,

@@ -1,18 +1,19 @@
-import { Text, TextInput, TextInputProps, View, StyleSheet } from 'react-native';
+import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
+
 import { theme } from '../styles/theme';
 
 type Props = TextInputProps & {
   label: string;
 };
 
-export function ZyraInput({ label, ...props }: Props) {
+export function ZyraInput({ label, style, ...props }: Props) {
   return (
     <View style={styles.wrapper}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
-        placeholderTextColor="#777"
-        style={styles.input}
-        autoCapitalize="none"
+        accessibilityLabel={label}
+        placeholderTextColor="#929292"
+        style={[styles.input, style]}
         {...props}
       />
     </View>
@@ -25,17 +26,25 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   label: {
-    color: theme.colors.text,
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 8,
+    marginBottom: 7,
+    marginLeft: 2,
+    color: theme.colors.label,
+    fontFamily: theme.fonts.semiBold,
+    fontSize: 16,
   },
   input: {
-    height: 48,
-    borderRadius: 8,
+    width: '100%',
+    height: 56,
+    paddingHorizontal: 16,
+    borderRadius: theme.radius.input,
     backgroundColor: theme.colors.input,
-    paddingHorizontal: 14,
     color: theme.colors.inputText,
-    fontSize: 15,
+    fontFamily: theme.fonts.medium,
+    fontSize: 16,
+    shadowColor: '#000000',
+    shadowOffset: { width: 2, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
   },
 });

@@ -1,8 +1,9 @@
 import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
+
 import { AuthLayout } from '../components/AuthLayout';
 import { ZyraButton } from '../components/ZyraButton';
+import { RootStackParamList } from '../navigation/AppNavigator';
 import { theme } from '../styles/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterBirthDate'>;
@@ -10,13 +11,13 @@ type Props = NativeStackScreenProps<RootStackParamList, 'RegisterBirthDate'>;
 export function RegisterBirthDateScreen({ navigation }: Props) {
   return (
     <AuthLayout
-      title=""
       onBack={() => navigation.goBack()}
+      contentStyle={styles.content}
       footer={<ZyraButton title="Continuar" onPress={() => navigation.navigate('RegisterGender')} />}
     >
-      <Text style={styles.question}>Qual sua data de Nascimento?</Text>
-      <Text style={styles.helper}>Isso permitirá entender melhor nosso público!</Text>
-      <TouchableOpacity activeOpacity={0.85} style={styles.dateButton}>
+      <Text style={styles.question}>Qual sua data de nascimento?</Text>
+      <Text style={styles.helper}>Isso permitirá entender melhor{`\n`}nosso público!</Text>
+      <TouchableOpacity accessibilityRole="button" activeOpacity={0.85} style={styles.dateButton}>
         <Text style={styles.dateText}>1 de Abril de 2004</Text>
       </TouchableOpacity>
     </AuthLayout>
@@ -24,35 +25,40 @@ export function RegisterBirthDateScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  content: {
+    justifyContent: 'center',
+    paddingBottom: 113,
+  },
   question: {
+    color: theme.colors.titleZyra,
+    fontFamily: theme.fonts.semiBold,
+    fontSize: 20,
     textAlign: 'center',
-    fontSize: 17,
-    fontWeight: '900',
-    color: theme.colors.text,
   },
   helper: {
+    color: theme.colors.titleZyra,
+    fontFamily: theme.fonts.regular,
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: 'center',
     marginTop: 4,
-    marginBottom: 24,
-    fontSize: 11,
-    lineHeight: 15,
-    color: theme.colors.text,
+    marginBottom: 14,
   },
   dateButton: {
-    height: 54,
-    borderRadius: 8,
+    height: 56,
+    borderRadius: 10,
     backgroundColor: theme.colors.input,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.14,
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#000000',
+    shadowOffset: { width: 2, height: 4 },
+    shadowOpacity: 0.25,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 4,
   },
   dateText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: theme.colors.text,
+    color: theme.colors.label,
+    fontFamily: theme.fonts.semiBold,
+    fontSize: 16,
   },
 });

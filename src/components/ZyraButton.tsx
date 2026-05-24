@@ -1,60 +1,49 @@
-import { Text, TouchableOpacity, TouchableOpacityProps, StyleSheet } from 'react-native';
+import { StyleProp, StyleSheet, Text, TouchableOpacity, ViewStyle } from 'react-native';
+
 import { theme } from '../styles/theme';
 
-type Props = TouchableOpacityProps & {
+type Props = {
   title: string;
-  variant?: 'primary' | 'secondary';
+  onPress: () => void;
+  style?: StyleProp<ViewStyle>;
+  disabled?: boolean;
 };
 
-export function ZyraButton({ title, variant = 'primary', style, disabled, ...props }: Props) {
-  const isPrimary = variant === 'primary';
-
+export function ZyraButton({ title, onPress, style, disabled = false }: Props) {
   return (
     <TouchableOpacity
-      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      activeOpacity={0.84}
       disabled={disabled}
-      style={[
-        styles.button,
-        isPrimary ? styles.primary : styles.secondary,
-        disabled && styles.disabled,
-        style,
-      ]}
-      {...props}
+      onPress={onPress}
+      style={[styles.button, disabled && styles.disabled, style]}
     >
-      <Text style={[styles.text, isPrimary ? styles.primaryText : styles.secondaryText]}>{title}</Text>
+      <Text style={styles.text}>{title}</Text>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    height: 48,
-    borderRadius: 10,
+    width: '100%',
+    height: 56,
+    borderRadius: theme.radius.button,
+    backgroundColor: theme.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    shadowColor: '#000000',
+    shadowOffset: { width: 2, height: 4 },
     shadowOpacity: 0.25,
-    shadowOffset: { width: 0, height: 4 },
     shadowRadius: 4,
     elevation: 4,
-  },
-  primary: {
-    backgroundColor: theme.colors.primary,
-  },
-  secondary: {
-    backgroundColor: theme.colors.input,
   },
   disabled: {
     opacity: 0.55,
   },
   text: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  primaryText: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 20,
     color: theme.colors.white,
-  },
-  secondaryText: {
-    color: theme.colors.text,
   },
 });
