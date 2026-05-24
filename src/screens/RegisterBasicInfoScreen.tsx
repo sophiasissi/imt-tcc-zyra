@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { AuthLayout } from '../components/AuthLayout';
 import { ZyraButton } from '../components/ZyraButton';
@@ -37,6 +38,7 @@ export function RegisterBasicInfoScreen({ navigation }: Props) {
     >
       <ZyraInput
         label="Nome"
+        placeholder="Digite seu nome"
         value={name}
         onChangeText={setName}
         onBlur={() => setNameTouched(true)}
@@ -45,8 +47,10 @@ export function RegisterBasicInfoScreen({ navigation }: Props) {
         returnKeyType="next"
         error={nameTouched && !nameIsValid ? 'O nome é obrigatório.' : undefined}
       />
+
       <ZyraInput
         label="Email"
+        placeholder="Digite seu email"
         value={email}
         onChangeText={setEmail}
         onBlur={() => setEmailTouched(true)}
