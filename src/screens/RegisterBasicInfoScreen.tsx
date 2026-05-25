@@ -18,10 +18,24 @@ export function RegisterBasicInfoScreen({ navigation }: Props) {
   const [emailTouched, setEmailTouched] = useState(false);
 
   const trimmedName = name.trim();
+  const trimmedEmail = email.trim().toLowerCase();
+
   const nameIsValid = trimmedName.length > 0;
-  const emailIsValid = EMAIL_PATTERN.test(email.trim());
+  const emailIsValid = EMAIL_PATTERN.test(trimmedEmail);
   const firstName = trimmedName.split(/\s+/)[0];
   const canContinue = nameIsValid && emailIsValid;
+
+  function handleContinue() {
+    if (!canContinue) {
+      return;
+    }
+
+    navigation.navigate('RegisterPassword', {
+      firstName,
+      name: trimmedName,
+      email: trimmedEmail,
+    });
+  }
 
   return (
     <AuthLayout
@@ -32,7 +46,7 @@ export function RegisterBasicInfoScreen({ navigation }: Props) {
         <ZyraButton
           title="Continuar"
           disabled={!canContinue}
-          onPress={() => navigation.navigate('RegisterPassword', { firstName })}
+          onPress={handleContinue}
         />
       }
     >
@@ -58,7 +72,11 @@ export function RegisterBasicInfoScreen({ navigation }: Props) {
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="done"
-        error={emailTouched && !emailIsValid ? 'Digite um e-mail válido, como nome@email.com.' : undefined}
+        error={
+          emailTouched && !emailIsValid
+            ? 'Digite um e-mail válido, como nome@email.com.'
+            : undefined
+        }
       />
     </AuthLayout>
   );

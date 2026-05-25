@@ -1,5 +1,6 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
 import { IntroScreen } from '../screens/IntroScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { RegisterBasicInfoScreen } from '../screens/RegisterBasicInfoScreen';
@@ -16,9 +17,24 @@ export type RootStackParamList = {
   Intro: undefined;
   RegisterStart: undefined;
   RegisterBasicInfo: undefined;
-  RegisterPassword: { firstName: string };
-  RegisterVerification: { firstName: string };
-  RegisterWelcome: { firstName: string };
+
+  RegisterPassword: {
+    firstName: string;
+    name: string;
+    email: string;
+  };
+
+  RegisterVerification: {
+    firstName: string;
+    name: string;
+    email: string;
+    password: string;
+  };
+
+  RegisterWelcome: {
+    firstName: string;
+  };
+
   RegisterBirthDate: undefined;
   RegisterGender: undefined;
   RegisterColorBlindness: undefined;
@@ -31,17 +47,41 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export function AppNavigator() {
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Intro">
+      <Stack.Navigator
+        screenOptions={{ headerShown: false }}
+        initialRouteName="Intro"
+      >
         <Stack.Screen name="Intro" component={IntroScreen} />
         <Stack.Screen name="RegisterStart" component={RegisterStartScreen} />
-        <Stack.Screen name="RegisterBasicInfo" component={RegisterBasicInfoScreen} />
-        <Stack.Screen name="RegisterPassword" component={RegisterPasswordScreen} />
-        <Stack.Screen name="RegisterVerification" component={RegisterVerificationScreen} />
-        <Stack.Screen name="RegisterWelcome" component={RegisterWelcomeScreen} />
-        <Stack.Screen name="RegisterBirthDate" component={RegisterBirthDateScreen} />
+        <Stack.Screen
+          name="RegisterBasicInfo"
+          component={RegisterBasicInfoScreen}
+        />
+        <Stack.Screen
+          name="RegisterPassword"
+          component={RegisterPasswordScreen}
+        />
+        <Stack.Screen
+          name="RegisterVerification"
+          component={RegisterVerificationScreen}
+        />
+        <Stack.Screen
+          name="RegisterWelcome"
+          component={RegisterWelcomeScreen}
+        />
+        <Stack.Screen
+          name="RegisterBirthDate"
+          component={RegisterBirthDateScreen}
+        />
         <Stack.Screen name="RegisterGender" component={RegisterGenderScreen} />
-        <Stack.Screen name="RegisterColorBlindness" component={RegisterColorBlindnessScreen} />
-        <Stack.Screen name="RegisterDifficulty" component={RegisterDifficultyScreen} />
+        <Stack.Screen
+          name="RegisterColorBlindness"
+          component={RegisterColorBlindnessScreen}
+        />
+        <Stack.Screen
+          name="RegisterDifficulty"
+          component={RegisterDifficultyScreen}
+        />
         <Stack.Screen name="Login" component={LoginScreen} />
       </Stack.Navigator>
     </NavigationContainer>
