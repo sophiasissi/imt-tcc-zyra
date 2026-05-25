@@ -1,18 +1,140 @@
 import { useRef, useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  Alert,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { AuthLayout } from '../components/AuthLayout';
 import { ZyraButton } from '../components/ZyraButton';
+import { apiRequest } from '../services/api';
 import { theme } from '../styles/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterVerification'>;
 
+type ConfirmSignUpResponse = {
+  message: string;
+};
+
+type LoginResponse = {
+  accessToken: string;
+  idToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  tokenType: string;
+};
+
+type RegisterProfileResponse = {
+  id: string;
+  cognitoSub: string;
+  nome: string | null;
+  email: string | null;
+};
+
 export function RegisterVerificationScreen({ navigation, route }: Props) {
+  const { firstName, name, email, password } = route.params;
+
   const [code, setCode] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
   const inputRef = useRef<TextInput>(null);
-  const normalizedCode = code.replace(/\D/g, '').slice(0, 4);
-  const canContinue = normalizedCode.length === 4;
+
+  const normalizedCode = code.replace(/\D/g, '').slice(0, 6);
+  const canContinue = normalizedCode.length === 6 && !isLoading;
+
+  async function handleContinue() {
+    if (!canContinue) {
+      console.log('[Verificação] Código ainda não possui 6 dígitos.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      console.log('[Verificação] Enviando código para confirmação...');
+
+      const confirmResponse =
+        await apiRequest<ConfirmSignUpResponse>('/auth/confirm-signup', {
+          method: 'POST',
+          body: JSON.stringify({
+            email,
+            confirmationCode: normalizedCode,
+          }),
+        });
+
+      console.log(
+        '[Verificação] Conta confirmada com sucesso.',
+        confirmResponse.message,
+      );
+
+      console.log('[Login automático] Iniciando autenticação...');
+
+      const loginResponse = await apiRequest<LoginResponse>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
+
+      console.log('[Login automático] Login concluído com sucesso.');
+      console.log(
+        '[Login automático] Access token recebido:',
+        Boolean(loginResponse.accessToken),
+      );
+      console.log(
+        '[Login automático] ID token recebido:',
+        Boolean(loginResponse.idToken),
+      );
+      console.log(
+        '[Login automático] Refresh token recebido:',
+        Boolean(loginResponse.refreshToken),
+      );
+
+      console.log('[Perfil] Iniciando criação do perfil inicial...');
+
+      const profileResponse =
+        await apiRequest<RegisterProfileResponse>('/auth/register-profile', {
+          method: 'POST',
+          token: loginResponse.accessToken,
+          body: JSON.stringify({
+            nome: name,
+            email,
+          }),
+        });
+
+      console.log('[Perfil] Perfil inicial salvo no PostgreSQL.');
+      console.log('[Perfil] ID interno recebido:', Boolean(profileResponse.id));
+      console.log(
+        '[Perfil] Vínculo Cognito recebido:',
+        Boolean(profileResponse.cognitoSub),
+      );
+
+      console.log('[Onboarding] Iniciando perguntas complementares...');
+
+      navigation.navigate('RegisterWelcome', {
+        firstName,
+        accessToken: loginResponse.accessToken,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível concluir seu cadastro. Tente novamente.';
+
+      console.error('[Cadastro] Erro na confirmação/login/perfil:', message);
+
+      Alert.alert('Erro no cadastro', message);
+    } finally {
+      setIsLoading(false);
+      console.log('[Cadastro] Processamento da verificação finalizado.');
+    }
+  }
 
   return (
     <AuthLayout
@@ -21,36 +143,43 @@ export function RegisterVerificationScreen({ navigation, route }: Props) {
       contentStyle={styles.content}
       footer={
         <ZyraButton
-          title="Continuar"
+          title={isLoading ? 'Confirmando...' : 'Continuar'}
           disabled={!canContinue}
-          onPress={() => navigation.navigate('RegisterWelcome', { firstName: route.params.firstName })}
+          onPress={handleContinue}
         />
       }
     >
       <Text style={styles.heading}>Insira seu código</Text>
-      <Text style={styles.description}>Seu código foi enviado a{`\n`}email/telefone do user</Text>
+
+      <Text style={styles.description}>
+        Seu código foi enviado para{`\n`}
+        {email}
+      </Text>
 
       <TouchableOpacity
         activeOpacity={1}
         style={styles.codeContainer}
         onPress={() => inputRef.current?.focus()}
         accessibilityRole="button"
-        accessibilityLabel="Campo para código de quatro dígitos"
+        accessibilityLabel="Campo para código de seis dígitos"
       >
         <View style={styles.slotRow} pointerEvents="none">
-          {[0, 1, 2, 3].map((index) => (
+          {[0, 1, 2, 3, 4, 5].map((index) => (
             <Text key={index} style={styles.slot}>
               {normalizedCode[index] ?? '—'}
             </Text>
           ))}
         </View>
+
         <TextInput
           ref={inputRef}
           accessibilityLabel="Código de verificação"
           value={normalizedCode}
-          onChangeText={(value) => setCode(value.replace(/\D/g, '').slice(0, 4))}
+          onChangeText={(value) =>
+            setCode(value.replace(/\D/g, '').slice(0, 6))
+          }
           keyboardType="number-pad"
-          maxLength={4}
+          maxLength={6}
           caretHidden
           autoFocus={false}
           textContentType="oneTimeCode"
@@ -77,7 +206,7 @@ const styles = StyleSheet.create({
     color: theme.colors.label,
     fontFamily: theme.fonts.regular,
     fontSize: 15,
-    lineHeight: 16,
+    lineHeight: 20,
     marginBottom: 24,
   },
   codeContainer: {

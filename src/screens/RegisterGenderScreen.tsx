@@ -1,17 +1,57 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
+
+import {
+  GeneroCadastro,
+  RootStackParamList,
+} from '../navigation/AppNavigator';
 import { AuthLayout } from '../components/AuthLayout';
 import { OptionPill } from '../components/OptionPill';
 import { ZyraButton } from '../components/ZyraButton';
 import { theme } from '../styles/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterGender'>;
-const options = ['Masculino', 'Feminino', 'Não Binário'];
 
-export function RegisterGenderScreen({ navigation }: Props) {
-  const [selected, setSelected] = useState<string | null>(null);
+type GenderOption = {
+  label: string;
+  value: GeneroCadastro;
+};
+
+const options: GenderOption[] = [
+  { label: 'Masculino', value: 'MASCULINO' },
+  { label: 'Feminino', value: 'FEMININO' },
+  { label: 'Não Binário', value: 'NAO_BINARIO' },
+];
+
+export function RegisterGenderScreen({ navigation, route }: Props) {
+  const { accessToken, dataNascimento } = route.params;
+
+  const [selected, setSelected] = useState<GeneroCadastro | null>(null);
+
+  function handleContinue() {
+    if (!selected) {
+      return;
+    }
+
+    console.log('[Onboarding] Gênero selecionado:', selected);
+
+    navigation.navigate('RegisterColorBlindness', {
+      accessToken,
+      dataNascimento,
+      genero: selected,
+    });
+  }
+
+  function handleSkip() {
+    console.log('[Onboarding] Usuário preferiu não informar gênero.');
+
+    navigation.navigate('RegisterColorBlindness', {
+      accessToken,
+      dataNascimento,
+      genero: 'PREFIRO_NAO_DIZER',
+    });
+  }
 
   return (
     <AuthLayout
@@ -19,22 +59,32 @@ export function RegisterGenderScreen({ navigation }: Props) {
       onBack={() => navigation.goBack()}
       footer={
         <View>
-          <Text onPress={() => navigation.navigate('RegisterColorBlindness')} style={styles.skip}>
+          <Text onPress={handleSkip} style={styles.skip}>
             Prefiro não dizer
           </Text>
+
           <ZyraButton
             title="Continuar"
             disabled={selected === null}
-            onPress={() => navigation.navigate('RegisterColorBlindness')}
+            onPress={handleContinue}
           />
         </View>
       }
     >
       <Text style={styles.question}>Como você se identifica?</Text>
-      <Text style={styles.helper}>Isso permitirá entender melhor{`\n`}nosso público!</Text>
+
+      <Text style={styles.helper}>
+        Isso permitirá entender melhor{`\n`}nosso público!
+      </Text>
+
       <View style={styles.options}>
         {options.map((option) => (
-          <OptionPill key={option} label={option} selected={selected === option} onPress={() => setSelected(option)} />
+          <OptionPill
+            key={option.value}
+            label={option.label}
+            selected={selected === option.value}
+            onPress={() => setSelected(option.value)}
+          />
         ))}
       </View>
     </AuthLayout>

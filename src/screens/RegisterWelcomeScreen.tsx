@@ -1,5 +1,6 @@
 import { StyleSheet, Text } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+
 import LittleGuy from '../../assets/images/littleguy.svg';
 import { AuthLayout } from '../components/AuthLayout';
 import { ZyraButton } from '../components/ZyraButton';
@@ -9,13 +10,27 @@ import { theme } from '../styles/theme';
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterWelcome'>;
 
 export function RegisterWelcomeScreen({ navigation, route }: Props) {
+  const { accessToken } = route.params;
   const firstName = route.params.firstName.trim() || 'usuário';
+
+  function handleContinue() {
+    console.log(
+      '[Onboarding] Saindo das boas-vindas. Token disponível:',
+      Boolean(accessToken),
+    );
+
+    navigation.navigate('RegisterBirthDate', {
+      accessToken,
+    });
+  }
 
   return (
     <AuthLayout
       showHeader={false}
       contentStyle={styles.content}
-      footer={<ZyraButton title="Continuar" onPress={() => navigation.navigate('RegisterBirthDate')} />}
+      footer={
+        <ZyraButton title="Continuar" onPress={handleContinue} />
+      }
     >
       <Text style={styles.logo}>ZYRA</Text>
       <LittleGuy style={styles.character} />

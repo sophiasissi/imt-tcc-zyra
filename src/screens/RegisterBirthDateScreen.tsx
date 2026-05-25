@@ -29,7 +29,17 @@ function formatDate(date: Date) {
   });
 }
 
-export function RegisterBirthDateScreen({ navigation }: Props) {
+function formatDateForApi(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+export function RegisterBirthDateScreen({ navigation, route }: Props) {
+  const { accessToken } = route.params;
+
   const [date, setDate] = useState<Date | null>(null);
   const [showPicker, setShowPicker] = useState(false);
 
@@ -40,7 +50,27 @@ export function RegisterBirthDateScreen({ navigation }: Props) {
 
     if (event.type === 'set' && selectedDate) {
       setDate(selectedDate);
+
+      console.log(
+        '[Onboarding] Data de nascimento selecionada:',
+        formatDateForApi(selectedDate),
+      );
     }
+  }
+
+  function handleContinue() {
+    if (!date) {
+      return;
+    }
+
+    const dataNascimento = formatDateForApi(date);
+
+    console.log('[Onboarding] Enviando data de nascimento para próxima etapa.');
+
+    navigation.navigate('RegisterGender', {
+      accessToken,
+      dataNascimento,
+    });
   }
 
   return (
@@ -51,7 +81,7 @@ export function RegisterBirthDateScreen({ navigation }: Props) {
         <ZyraButton
           title="Continuar"
           disabled={!date}
-          onPress={() => navigation.navigate('RegisterGender')}
+          onPress={handleContinue}
         />
       }
     >
@@ -75,9 +105,7 @@ export function RegisterBirthDateScreen({ navigation }: Props) {
             date ? styles.dateTextSelected : undefined,
           ]}
         >
-          {date
-            ? formatDate(date)
-            : 'Selecione sua data de nascimento'}
+          {date ? formatDate(date) : 'Selecione sua data de nascimento'}
         </Text>
       </TouchableOpacity>
 
