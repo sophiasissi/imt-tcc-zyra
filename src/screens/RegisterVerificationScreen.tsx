@@ -29,6 +29,13 @@ type LoginResponse = {
   tokenType: string;
 };
 
+type RegisterProfileResponse = {
+  id: string;
+  cognitoSub: string;
+  nome: string | null;
+  email: string | null;
+};
+
 export function RegisterVerificationScreen({ navigation, route }: Props) {
   const { firstName, name, email, password } = route.params;
 
@@ -89,23 +96,43 @@ export function RegisterVerificationScreen({ navigation, route }: Props) {
         Boolean(loginResponse.refreshToken),
       );
 
-      console.log('[Navegação] Direcionando usuário para boas-vindas...');
+      console.log('[Perfil] Iniciando criação do perfil inicial...');
+
+      const profileResponse =
+        await apiRequest<RegisterProfileResponse>('/auth/register-profile', {
+          method: 'POST',
+          token: loginResponse.accessToken,
+          body: JSON.stringify({
+            nome: name,
+            email,
+          }),
+        });
+
+      console.log('[Perfil] Perfil inicial salvo no PostgreSQL.');
+      console.log('[Perfil] ID interno recebido:', Boolean(profileResponse.id));
+      console.log(
+        '[Perfil] Vínculo Cognito recebido:',
+        Boolean(profileResponse.cognitoSub),
+      );
+
+      console.log('[Onboarding] Iniciando perguntas complementares...');
 
       navigation.navigate('RegisterWelcome', {
         firstName,
+        accessToken: loginResponse.accessToken,
       });
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
-          : 'Não foi possível confirmar seu cadastro. Tente novamente.';
+          : 'Não foi possível concluir seu cadastro. Tente novamente.';
 
-      console.error('[Verificação/Login automático] Erro:', message);
+      console.error('[Cadastro] Erro na confirmação/login/perfil:', message);
 
-      Alert.alert('Erro na confirmação', message);
+      Alert.alert('Erro no cadastro', message);
     } finally {
       setIsLoading(false);
-      console.log('[Verificação] Processamento finalizado.');
+      console.log('[Cadastro] Processamento da verificação finalizado.');
     }
   }
 

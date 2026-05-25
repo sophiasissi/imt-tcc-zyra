@@ -1,18 +1,123 @@
 import { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { AuthLayout } from '../components/AuthLayout';
 import { ZyraButton } from '../components/ZyraButton';
+import { apiRequest } from '../services/api';
 import { theme } from '../styles/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterDifficulty'>;
 
+type UpdateProfileResponse = {
+  id: string;
+  cognitoSub: string;
+  dataNascimento: string | null;
+  genero: string | null;
+  tipoDaltonismo: string | null;
+  nivelDificuldadeLooks: number | null;
+};
+
 const numbers = [0, 1, 2, 3, 4, 5];
 
-export function RegisterDifficultyScreen({ navigation }: Props) {
+export function RegisterDifficultyScreen({ navigation, route }: Props) {
+  const { accessToken, dataNascimento, genero, tipoDaltonismo } = route.params;
+
   const [selected, setSelected] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  async function finishOnboarding(nivelDificuldadeLooks?: number) {
+    if (!accessToken) {
+      console.error('[Onboarding] Token não disponível para salvar perfil.');
+
+      Alert.alert(
+        'Cadastro não autenticado',
+        'Para salvar seus dados, conclua o cadastro utilizando e-mail.',
+      );
+
+      return;
+    }
+
+    const payload = {
+      dataNascimento,
+      ...(genero ? { genero } : {}),
+      ...(tipoDaltonismo ? { tipoDaltonismo } : {}),
+      ...(nivelDificuldadeLooks !== undefined
+        ? { nivelDificuldadeLooks }
+        : {}),
+    };
+
+    try {
+      setIsLoading(true);
+
+      console.log('[Onboarding] Enviando dados complementares para o banco...');
+      console.log('[Onboarding] Data de nascimento enviada:', dataNascimento);
+      console.log('[Onboarding] Gênero enviado:', genero ?? 'não informado');
+      console.log(
+        '[Onboarding] Tipo de daltonismo enviado:',
+        tipoDaltonismo ?? 'não informado',
+      );
+      console.log(
+        '[Onboarding] Dificuldade enviada:',
+        nivelDificuldadeLooks ?? 'não informado',
+      );
+
+      const response = await apiRequest<UpdateProfileResponse>('/users/me', {
+        method: 'PATCH',
+        token: accessToken,
+        body: JSON.stringify(payload),
+      });
+
+      console.log('[Onboarding] Perfil complementar atualizado com sucesso.');
+      console.log(
+        '[Onboarding] Data de nascimento salva:',
+        Boolean(response.dataNascimento),
+      );
+      console.log('[Onboarding] Fluxo de cadastro concluído.');
+
+      Alert.alert('Cadastro concluído', 'Suas informações foram salvas com sucesso.');
+
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Intro' }],
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível salvar suas informações.';
+
+      console.error('[Onboarding] Erro ao atualizar perfil:', message);
+
+      Alert.alert('Erro ao finalizar cadastro', message);
+    } finally {
+      setIsLoading(false);
+      console.log('[Onboarding] Processamento finalizado.');
+    }
+  }
+
+  function handleContinue() {
+    if (selected === null) {
+      return;
+    }
+
+    console.log('[Onboarding] Nível de dificuldade selecionado:', selected);
+
+    void finishOnboarding(selected);
+  }
+
+  function handleSkip() {
+    console.log('[Onboarding] Usuário preferiu não informar dificuldade.');
+
+    void finishOnboarding();
+  }
 
   return (
     <AuthLayout
@@ -23,20 +128,27 @@ export function RegisterDifficultyScreen({ navigation }: Props) {
           <TouchableOpacity
             accessibilityRole="button"
             activeOpacity={0.8}
-            onPress={() => navigation.navigate('Intro')}
+            disabled={isLoading}
+            onPress={handleSkip}
           >
             <Text style={styles.skip}>Prefiro não dizer</Text>
           </TouchableOpacity>
+
           <ZyraButton
-            title="Continuar"
-            disabled={selected === null}
-            onPress={() => navigation.navigate('Intro')}
+            title={isLoading ? 'Salvando...' : 'Continuar'}
+            disabled={selected === null || isLoading}
+            onPress={handleContinue}
           />
         </>
       }
     >
-      <Text style={styles.question}>Quanta dificuldade você sente ao combinar roupas?</Text>
-      <Text style={styles.helper}>Isso permitirá entender melhor{`\n`}nosso público!</Text>
+      <Text style={styles.question}>
+        Quanta dificuldade você sente ao combinar roupas?
+      </Text>
+
+      <Text style={styles.helper}>
+        Isso permitirá entender melhor{`\n`}nosso público!
+      </Text>
 
       <View style={styles.scale}>
         {numbers.map((number) => (
@@ -44,10 +156,21 @@ export function RegisterDifficultyScreen({ navigation }: Props) {
             key={number}
             accessibilityRole="button"
             activeOpacity={0.82}
+            disabled={isLoading}
             onPress={() => setSelected(number)}
-            style={[styles.circle, selected === number && styles.selectedCircle]}
+            style={[
+              styles.circle,
+              selected === number && styles.selectedCircle,
+            ]}
           >
-            <Text style={[styles.number, selected === number && styles.selectedNumber]}>{number}</Text>
+            <Text
+              style={[
+                styles.number,
+                selected === number && styles.selectedNumber,
+              ]}
+            >
+              {number}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>

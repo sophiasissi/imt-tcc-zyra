@@ -8,7 +8,11 @@ import {
   View,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
+
+import {
+  RootStackParamList,
+  TipoDaltonismoCadastro,
+} from '../navigation/AppNavigator';
 import { AuthLayout } from '../components/AuthLayout';
 import { ZyraButton } from '../components/ZyraButton';
 import { theme } from '../styles/theme';
@@ -17,24 +21,60 @@ type Props = NativeStackScreenProps<
   RootStackParamList,
   'RegisterColorBlindness'
 >;
-const options = [
-  'Protanomalia',
-  'Protanopia',
-  'Deuteranomalia',
-  'Deuteranopia',
-  'Tritanomalia',
-  'Tritanopia',
-  'Acromatopsia',
-  'Não sei',
+
+type ColorBlindnessOption = {
+  label: string;
+  value: TipoDaltonismoCadastro;
+};
+
+const options: ColorBlindnessOption[] = [
+  { label: 'Protanomalia', value: 'PROTANOMALIA' },
+  { label: 'Protanopia', value: 'PROTANOPIA' },
+  { label: 'Deuteranomalia', value: 'DEUTERANOMALIA' },
+  { label: 'Deuteranopia', value: 'DEUTERANOPIA' },
+  { label: 'Tritanomalia', value: 'TRITANOMALIA' },
+  { label: 'Tritanopia', value: 'TRITANOPIA' },
+  { label: 'Acromatopsia', value: 'ACROMATOPSIA' },
+  { label: 'Não sei', value: 'NAO_SEI' },
 ];
 
-export function RegisterColorBlindnessScreen({ navigation }: Props) {
-  const [selected, setSelected] = useState<string | null>(null);
+export function RegisterColorBlindnessScreen({
+  navigation,
+  route,
+}: Props) {
+  const { accessToken, dataNascimento, genero } = route.params;
+
+  const [selected, setSelected] = useState<ColorBlindnessOption | null>(null);
   const [open, setOpen] = useState(false);
 
-  function choose(option: string) {
+  function choose(option: ColorBlindnessOption) {
     setSelected(option);
     setOpen(false);
+
+    console.log('[Onboarding] Tipo de daltonismo selecionado:', option.value);
+  }
+
+  function handleContinue() {
+    if (!selected) {
+      return;
+    }
+
+    navigation.navigate('RegisterDifficulty', {
+      accessToken,
+      dataNascimento,
+      genero,
+      tipoDaltonismo: selected.value,
+    });
+  }
+
+  function handleSkip() {
+    console.log('[Onboarding] Tipo de daltonismo não informado.');
+
+    navigation.navigate('RegisterDifficulty', {
+      accessToken,
+      dataNascimento,
+      genero,
+    });
   }
 
   return (
@@ -43,34 +83,35 @@ export function RegisterColorBlindnessScreen({ navigation }: Props) {
       onBack={() => navigation.goBack()}
       footer={
         <View>
-          <Text
-            onPress={() => navigation.navigate('RegisterDifficulty')}
-            style={styles.skip}
-          >
+          <Text onPress={handleSkip} style={styles.skip}>
             Não tenho!
           </Text>
+
           <ZyraButton
             title="Continuar"
             disabled={selected === null}
-            onPress={() => navigation.navigate('RegisterDifficulty')}
+            onPress={handleContinue}
           />
         </View>
       }
     >
       <Text style={styles.question}>Qual tipo de daltonismo você tem?</Text>
+
       <Text style={styles.helper}>
         Isso permitirá entender melhor{`\n`}nosso público!
       </Text>
+
       <TouchableOpacity
         activeOpacity={0.85}
         style={styles.select}
         onPress={() => setOpen(true)}
       >
         <Text style={styles.selectText}>
-          {selected ?? 'Selecione uma opção'}
+          {selected?.label ?? 'Selecione uma opção'}
         </Text>
         <Text style={styles.chevron}>⌄</Text>
       </TouchableOpacity>
+
       <Modal
         transparent
         visible={open}
@@ -81,11 +122,11 @@ export function RegisterColorBlindnessScreen({ navigation }: Props) {
           <View style={styles.modalCard}>
             {options.map((option) => (
               <TouchableOpacity
-                key={option}
+                key={option.value}
                 style={styles.modalOption}
                 onPress={() => choose(option)}
               >
-                <Text style={styles.modalText}>{option}</Text>
+                <Text style={styles.modalText}>{option.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -125,7 +166,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 4,
-    textAlign: 'center',
   },
   selectText: {
     color: theme.colors.label,
@@ -150,12 +190,20 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
     overflow: 'hidden',
   },
-   chevron: { fontSize: 24, color: theme.colors.text, marginTop: -8 },
+  chevron: {
+    fontSize: 24,
+    color: theme.colors.text,
+    marginTop: -8,
+  },
   modalOption: {
     paddingVertical: 15,
     paddingHorizontal: 18,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#CCC',
   },
-  modalText: { fontSize: 15, fontWeight: '700', color: theme.colors.text },
+  modalText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
 });

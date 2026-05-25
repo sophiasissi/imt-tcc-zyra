@@ -13,6 +13,22 @@ import { RegisterStartScreen } from '../screens/RegisterStartScreen';
 import { RegisterVerificationScreen } from '../screens/RegisterVerificationScreen';
 import { RegisterWelcomeScreen } from '../screens/RegisterWelcomeScreen';
 
+export type GeneroCadastro =
+  | 'MASCULINO'
+  | 'FEMININO'
+  | 'NAO_BINARIO'
+  | 'PREFIRO_NAO_DIZER';
+
+export type TipoDaltonismoCadastro =
+  | 'PROTANOMALIA'
+  | 'PROTANOPIA'
+  | 'DEUTERANOMALIA'
+  | 'DEUTERANOPIA'
+  | 'TRITANOMALIA'
+  | 'TRITANOPIA'
+  | 'ACROMATOPSIA'
+  | 'NAO_SEI';
+
 export type RootStackParamList = {
   Intro: undefined;
   RegisterStart: undefined;
@@ -33,12 +49,31 @@ export type RootStackParamList = {
 
   RegisterWelcome: {
     firstName: string;
+    accessToken?: string;
   };
 
-  RegisterBirthDate: undefined;
-  RegisterGender: undefined;
-  RegisterColorBlindness: undefined;
-  RegisterDifficulty: undefined;
+  RegisterBirthDate: {
+    accessToken?: string;
+  };
+
+  RegisterGender: {
+    accessToken?: string;
+    dataNascimento: string;
+  };
+
+  RegisterColorBlindness: {
+    accessToken?: string;
+    dataNascimento: string;
+    genero?: GeneroCadastro;
+  };
+
+  RegisterDifficulty: {
+    accessToken?: string;
+    dataNascimento: string;
+    genero?: GeneroCadastro;
+    tipoDaltonismo?: TipoDaltonismoCadastro;
+  };
+
   Login: undefined;
 };
 
