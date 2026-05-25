@@ -1,11 +1,5 @@
 import { useState } from 'react';
-import {
-  Alert,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import GoogleIcon from '../../assets/icons/googleColor.svg';
@@ -88,10 +82,7 @@ export function LoginScreen({ navigation }: Props) {
         '[Login] Access token recebido:',
         Boolean(loginResponse.accessToken),
       );
-      console.log(
-        '[Login] ID token recebido:',
-        Boolean(loginResponse.idToken),
-      );
+      console.log('[Login] ID token recebido:', Boolean(loginResponse.idToken));
       console.log(
         '[Login] Refresh token recebido:',
         Boolean(loginResponse.refreshToken),
@@ -113,10 +104,7 @@ export function LoginScreen({ navigation }: Props) {
         '[Login] Vínculo Cognito recebido:',
         Boolean(profileResponse.cognitoSub),
       );
-      console.log(
-        '[Login] Nome salvo:',
-        Boolean(profileResponse.nome),
-      );
+      console.log('[Login] Nome salvo:', Boolean(profileResponse.nome));
       console.log(
         '[Login] Onboarding possui data de nascimento:',
         Boolean(profileResponse.dataNascimento),
@@ -154,10 +142,9 @@ export function LoginScreen({ navigation }: Props) {
   }
 
   function handleForgotPassword() {
-    Alert.alert(
-      'Em breve',
-      'A recuperação de senha será integrada na próxima etapa.',
-    );
+    console.log('[Recuperação] Usuário iniciou recuperação de senha.');
+
+    navigation.navigate('ForgotPasswordEmail');
   }
 
   return (

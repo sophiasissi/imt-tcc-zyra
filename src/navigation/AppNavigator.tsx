@@ -12,6 +12,9 @@ import { RegisterPasswordScreen } from '../screens/RegisterPasswordScreen';
 import { RegisterStartScreen } from '../screens/RegisterStartScreen';
 import { RegisterVerificationScreen } from '../screens/RegisterVerificationScreen';
 import { RegisterWelcomeScreen } from '../screens/RegisterWelcomeScreen';
+import { ForgotPasswordEmailScreen } from '../screens/ForgotPasswordEmailScreen';
+import { ForgotPasswordVerificationScreen } from '../screens/ForgotPasswordVerificationScreen';
+import { ForgotPasswordNewPasswordScreen } from '../screens/ForgotPasswordNewPasswordScreen';
 
 export type GeneroCadastro =
   | 'MASCULINO'
@@ -75,6 +78,17 @@ export type RootStackParamList = {
   };
 
   Login: undefined;
+
+  ForgotPasswordEmail: undefined;
+
+  ForgotPasswordVerification: {
+    email: string;
+  };
+
+  ForgotPasswordNewPassword: {
+    email: string;
+    confirmationCode: string;
+  };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -118,6 +132,18 @@ export function AppNavigator() {
           component={RegisterDifficultyScreen}
         />
         <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen
+          name="ForgotPasswordEmail"
+          component={ForgotPasswordEmailScreen}
+        />
+        <Stack.Screen
+          name="ForgotPasswordVerification"
+          component={ForgotPasswordVerificationScreen}
+        />
+        <Stack.Screen
+          name="ForgotPasswordNewPassword"
+          component={ForgotPasswordNewPasswordScreen}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
