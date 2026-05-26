@@ -19,6 +19,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'RegisterDifficulty'>;
 type UpdateProfileResponse = {
   id: string;
   cognitoSub: string;
+  nome?: string | null;
   dataNascimento: string | null;
   genero: string | null;
   tipoDaltonismo: string | null;
@@ -80,13 +81,19 @@ export function RegisterDifficultyScreen({ navigation, route }: Props) {
         '[Onboarding] Data de nascimento salva:',
         Boolean(response.dataNascimento),
       );
-      console.log('[Onboarding] Fluxo de cadastro concluído.');
-
-      Alert.alert('Cadastro concluído', 'Suas informações foram salvas com sucesso.');
+      console.log('[Onboarding] Direcionando usuário para a Home...');
 
       navigation.reset({
         index: 0,
-        routes: [{ name: 'Intro' }],
+        routes: [
+          {
+            name: 'Home',
+            params: {
+              accessToken,
+              nome: response.nome,
+            },
+          },
+        ],
       });
     } catch (error) {
       const message =
