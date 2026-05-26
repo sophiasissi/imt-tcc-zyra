@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import GoogleIcon from '../../assets/icons/googleColor.svg';
@@ -105,20 +111,20 @@ export function LoginScreen({ navigation }: Props) {
         Boolean(profileResponse.cognitoSub),
       );
       console.log('[Login] Nome salvo:', Boolean(profileResponse.nome));
-      console.log(
-        '[Login] Onboarding possui data de nascimento:',
-        Boolean(profileResponse.dataNascimento),
-      );
+      console.log('[Login] Direcionando usuário para a Home...');
 
-      Alert.alert(
-        'Login realizado',
-        `Bem-vindo(a) de volta, ${profileResponse.nome ?? 'usuário'}! Seu perfil foi localizado.`,
-      );
-
-      /*
-        A navegação para Home será adicionada quando a tela principal
-        estiver conectada ao fluxo autenticado.
-      */
+      navigation.reset({
+        index: 0,
+        routes: [
+          {
+            name: 'Home',
+            params: {
+              accessToken: loginResponse.accessToken,
+              nome: profileResponse.nome,
+            },
+          },
+        ],
+      });
     } catch (error) {
       const message =
         error instanceof Error

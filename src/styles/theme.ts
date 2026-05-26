@@ -14,6 +14,8 @@ export const theme = {
     white: '#FFFFFF',
     border: '#D4D4D4',
     link: '#B90043',
+    shadow: '#DE0051',
+    cinzaClaro: '#CCCCCC',
   },
   spacing: {
     screen: 20,

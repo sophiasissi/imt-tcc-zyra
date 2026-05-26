@@ -3,6 +3,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { IntroScreen } from '../screens/IntroScreen';
 import { LoginScreen } from '../screens/LoginScreen';
+import { HomeScreen } from '../screens/HomeScreen';
+import { ChatScreen } from '../screens/ChatScreen';
 import { RegisterBasicInfoScreen } from '../screens/RegisterBasicInfoScreen';
 import { RegisterBirthDateScreen } from '../screens/RegisterBirthDateScreen';
 import { RegisterColorBlindnessScreen } from '../screens/RegisterColorBlindnessScreen';
@@ -89,6 +91,15 @@ export type RootStackParamList = {
     email: string;
     confirmationCode: string;
   };
+
+  Home: {
+    accessToken: string;
+    nome?: string | null;
+  };
+
+  Chat: {
+    nome?: string | null;
+  };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -143,6 +154,17 @@ export function AppNavigator() {
         <Stack.Screen
           name="ForgotPasswordNewPassword"
           component={ForgotPasswordNewPasswordScreen}
+        />
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen
+          name="Chat"
+          component={ChatScreen}
+          options={{
+            animation: 'none',
+            presentation: 'transparentModal',
+            contentStyle: { backgroundColor: 'transparent' },
+            gestureEnabled: false,
+          }}
         />
       </Stack.Navigator>
     </NavigationContainer>
