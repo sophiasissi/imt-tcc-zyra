@@ -1,17 +1,12 @@
 import { useState } from 'react';
-import {
-  Alert,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import GoogleIcon from '../../assets/icons/googleColor.svg';
 import { AuthLayout } from '../components/AuthLayout';
 import { ZyraButton } from '../components/ZyraButton';
 import { ZyraInput } from '../components/ZyraInput';
+import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { apiRequest } from '../services/api';
 import { theme } from '../styles/theme';
@@ -45,6 +40,7 @@ export function LoginScreen({ navigation }: Props) {
   const [emailTouched, setEmailTouched] = useState(false);
   const [senhaTouched, setSenhaTouched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [popup, setPopup] = useState<ZyraPopupConfig | null>(null);
 
   const normalizedEmail = email.trim().toLowerCase();
   const emailValido = EMAIL_PATTERN.test(normalizedEmail);
@@ -60,6 +56,10 @@ export function LoginScreen({ navigation }: Props) {
 
   const erroSenha =
     senhaTouched && !senhaPreenchida ? 'A senha é obrigatória.' : undefined;
+
+  function closePopup() {
+    setPopup(null);
+  }
 
   async function handleEntrar() {
     setEmailTouched(true);
@@ -84,17 +84,6 @@ export function LoginScreen({ navigation }: Props) {
       });
 
       console.log('[Login] Autenticação concluída com sucesso.');
-      console.log(
-        '[Login] Access token recebido:',
-        Boolean(loginResponse.accessToken),
-      );
-      console.log('[Login] ID token recebido:', Boolean(loginResponse.idToken));
-      console.log(
-        '[Login] Refresh token recebido:',
-        Boolean(loginResponse.refreshToken),
-      );
-
-      console.log('[Login] Buscando perfil do usuário no PostgreSQL...');
 
       const profileResponse = await apiRequest<UserProfileResponse>(
         '/users/me',
@@ -105,12 +94,6 @@ export function LoginScreen({ navigation }: Props) {
       );
 
       console.log('[Login] Perfil localizado com sucesso.');
-      console.log('[Login] ID interno recebido:', Boolean(profileResponse.id));
-      console.log(
-        '[Login] Vínculo Cognito recebido:',
-        Boolean(profileResponse.cognitoSub),
-      );
-      console.log('[Login] Nome salvo:', Boolean(profileResponse.nome));
       console.log('[Login] Direcionando usuário para a Home...');
 
       navigation.reset({
@@ -126,14 +109,23 @@ export function LoginScreen({ navigation }: Props) {
         ],
       });
     } catch (error) {
-      const message =
+      const rawMessage =
         error instanceof Error
           ? error.message
           : 'Não foi possível entrar na sua conta.';
 
-      console.error('[Login] Erro ao autenticar ou localizar perfil:', message);
+      console.error('[Login] Erro ao autenticar ou localizar perfil:', rawMessage);
 
-      Alert.alert('Erro ao entrar', message);
+      const message = rawMessage.includes('conectar ao servidor')
+        ? rawMessage
+        : 'Confira seu email e senha e tente novamente.';
+
+      setPopup({
+        variant: 'error',
+        title: 'Não foi possível entrar',
+        message,
+        buttonText: 'Entendi',
+      });
     } finally {
       setIsLoading(false);
       console.log('[Login] Processamento finalizado.');
@@ -141,10 +133,14 @@ export function LoginScreen({ navigation }: Props) {
   }
 
   function handleGoogleLogin() {
-    Alert.alert(
-      'Em breve',
-      'O login com Google ainda não está integrado. Entre usando email e senha.',
-    );
+    setPopup({
+      variant: 'info',
+      title: 'Em breve',
+      message:
+        'O login com Google ainda não está integrado. Entre usando email e senha.',
+      buttonText: 'Entendi',
+      showCloseButton: true,
+    });
   }
 
   function handleForgotPassword() {
@@ -154,71 +150,82 @@ export function LoginScreen({ navigation }: Props) {
   }
 
   return (
-    <AuthLayout
-      title="Entrar na conta"
-      onBack={() => navigation.goBack()}
-      contentStyle={styles.content}
-      footer={
-        <ZyraButton
-          title={isLoading ? 'Entrando...' : 'Entrar'}
-          disabled={!podeEntrar}
-          onPress={handleEntrar}
+    <>
+      <AuthLayout
+        title="Entrar na conta"
+        onBack={() => navigation.goBack()}
+        contentStyle={styles.content}
+        footer={
+          <ZyraButton
+            title={isLoading ? 'Entrando...' : 'Entrar'}
+            disabled={!podeEntrar}
+            onPress={handleEntrar}
+          />
+        }
+      >
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Entrar com Google"
+          activeOpacity={0.84}
+          style={styles.googleButton}
+          onPress={handleGoogleLogin}
+        >
+          <GoogleIcon width={20} height={20} />
+          <Text style={styles.googleText}>Entrar com Google</Text>
+        </TouchableOpacity>
+
+        <View style={styles.dividerRow}>
+          <View style={styles.divider} />
+          <Text style={styles.or}>ou</Text>
+          <View style={styles.divider} />
+        </View>
+
+        <ZyraInput
+          label="Email"
+          placeholder="Digite seu email"
+          value={email}
+          onChangeText={setEmail}
+          onBlur={() => setEmailTouched(true)}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="email-address"
+          returnKeyType="next"
+          error={erroEmail}
         />
-      }
-    >
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel="Entrar com Google"
-        activeOpacity={0.84}
-        style={styles.googleButton}
-        onPress={handleGoogleLogin}
-      >
-        <GoogleIcon width={20} height={20} />
-        <Text style={styles.googleText}>Entrar com Google</Text>
-      </TouchableOpacity>
 
-      <View style={styles.dividerRow}>
-        <View style={styles.divider} />
-        <Text style={styles.or}>ou</Text>
-        <View style={styles.divider} />
-      </View>
+        <ZyraInput
+          label="Senha"
+          placeholder="Digite sua senha"
+          value={senha}
+          onChangeText={setSenha}
+          onBlur={() => setSenhaTouched(true)}
+          secureTextEntry
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="done"
+          error={erroSenha}
+        />
 
-      <ZyraInput
-        label="Email"
-        placeholder="Digite seu email"
-        value={email}
-        onChangeText={setEmail}
-        onBlur={() => setEmailTouched(true)}
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="email-address"
-        returnKeyType="next"
-        error={erroEmail}
-      />
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Esqueci minha senha"
+          activeOpacity={0.8}
+          style={styles.forgotButton}
+          onPress={handleForgotPassword}
+        >
+          <Text style={styles.forgot}>esqueceu sua senha?</Text>
+        </TouchableOpacity>
+      </AuthLayout>
 
-      <ZyraInput
-        label="Senha"
-        placeholder="Digite sua senha"
-        value={senha}
-        onChangeText={setSenha}
-        onBlur={() => setSenhaTouched(true)}
-        secureTextEntry
-        autoCapitalize="none"
-        autoCorrect={false}
-        returnKeyType="done"
-        error={erroSenha}
-      />
-
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel="Esqueci minha senha"
-        activeOpacity={0.8}
-        style={styles.forgotButton}
-        onPress={handleForgotPassword}
-      >
-        <Text style={styles.forgot}>esqueceu sua senha?</Text>
-      </TouchableOpacity>
-    </AuthLayout>
+      {popup ? (
+        <ZyraPopup
+          visible
+          {...popup}
+          onConfirm={popup.onConfirm ?? closePopup}
+          onClose={closePopup}
+        />
+      ) : null}
+    </>
   );
 }
 

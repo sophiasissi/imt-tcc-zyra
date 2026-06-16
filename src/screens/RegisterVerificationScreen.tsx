@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
 import {
-  Alert,
   StyleSheet,
   Text,
   TextInput,
@@ -12,6 +11,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { AuthLayout } from '../components/AuthLayout';
 import { ZyraButton } from '../components/ZyraButton';
+import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
 import { apiRequest } from '../services/api';
 import { theme } from '../styles/theme';
 
@@ -36,16 +36,40 @@ type RegisterProfileResponse = {
   email: string | null;
 };
 
+function isInvalidCodeMessage(message: string) {
+  const lowerMessage = message.toLowerCase();
+
+  return (
+    lowerMessage.includes('código inválido') ||
+    lowerMessage.includes('codigo invalido') ||
+    lowerMessage.includes('code')
+  );
+}
+
+function isEmailAlreadyRegistered(message: string) {
+  const lowerMessage = message.toLowerCase();
+
+  return (
+    lowerMessage.includes('email já possui uma conta') ||
+    lowerMessage.includes('email já está cadastrado')
+  );
+}
+
 export function RegisterVerificationScreen({ navigation, route }: Props) {
   const { firstName, name, email, password } = route.params;
 
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [popup, setPopup] = useState<ZyraPopupConfig | null>(null);
 
   const inputRef = useRef<TextInput>(null);
 
   const normalizedCode = code.replace(/\D/g, '').slice(0, 6);
   const canContinue = normalizedCode.length === 6 && !isLoading;
+
+  function closePopup() {
+    setPopup(null);
+  }
 
   async function handleContinue() {
     if (!canContinue) {
@@ -129,7 +153,39 @@ export function RegisterVerificationScreen({ navigation, route }: Props) {
 
       console.error('[Cadastro] Erro na confirmação/login/perfil:', message);
 
-      Alert.alert('Erro no cadastro', message);
+      if (isInvalidCodeMessage(message)) {
+        setPopup({
+          variant: 'error',
+          title: 'Código inválido',
+          message: 'Confira o código enviado para seu email e tente novamente.',
+          buttonText: 'Tentar novamente',
+        });
+
+        return;
+      }
+
+      if (isEmailAlreadyRegistered(message)) {
+        setPopup({
+          variant: 'warning',
+          title: 'Este email já está cadastrado',
+          message:
+            'Entre com sua senha ou recupere o acesso caso tenha esquecido.',
+          buttonText: 'Ir para login',
+          onConfirm: () => {
+            setPopup(null);
+            navigation.navigate('Login');
+          },
+        });
+
+        return;
+      }
+
+      setPopup({
+        variant: 'error',
+        title: 'Não foi possível concluir seu cadastro',
+        message,
+        buttonText: 'Entendi',
+      });
     } finally {
       setIsLoading(false);
       console.log('[Cadastro] Processamento da verificação finalizado.');
@@ -137,57 +193,68 @@ export function RegisterVerificationScreen({ navigation, route }: Props) {
   }
 
   return (
-    <AuthLayout
-      title="Crie uma conta"
-      onBack={() => navigation.goBack()}
-      contentStyle={styles.content}
-      footer={
-        <ZyraButton
-          title={isLoading ? 'Confirmando...' : 'Continuar'}
-          disabled={!canContinue}
-          onPress={handleContinue}
-        />
-      }
-    >
-      <Text style={styles.heading}>Insira seu código</Text>
-
-      <Text style={styles.description}>
-        Seu código foi enviado para{`\n`}
-        {email}
-      </Text>
-
-      <TouchableOpacity
-        activeOpacity={1}
-        style={styles.codeContainer}
-        onPress={() => inputRef.current?.focus()}
-        accessibilityRole="button"
-        accessibilityLabel="Campo para código de seis dígitos"
+    <>
+      <AuthLayout
+        title="Crie uma conta"
+        onBack={() => navigation.goBack()}
+        contentStyle={styles.content}
+        footer={
+          <ZyraButton
+            title={isLoading ? 'Confirmando...' : 'Continuar'}
+            disabled={!canContinue}
+            onPress={handleContinue}
+          />
+        }
       >
-        <View style={styles.slotRow} pointerEvents="none">
-          {[0, 1, 2, 3, 4, 5].map((index) => (
-            <Text key={index} style={styles.slot}>
-              {normalizedCode[index] ?? '—'}
-            </Text>
-          ))}
-        </View>
+        <Text style={styles.heading}>Insira seu código</Text>
 
-        <TextInput
-          ref={inputRef}
-          accessibilityLabel="Código de verificação"
-          value={normalizedCode}
-          onChangeText={(value) =>
-            setCode(value.replace(/\D/g, '').slice(0, 6))
-          }
-          keyboardType="number-pad"
-          maxLength={6}
-          caretHidden
-          autoFocus={false}
-          textContentType="oneTimeCode"
-          autoComplete="one-time-code"
-          style={styles.hiddenInput}
+        <Text style={styles.description}>
+          Seu código foi enviado para{`\n`}
+          {email}
+        </Text>
+
+        <TouchableOpacity
+          activeOpacity={1}
+          style={styles.codeContainer}
+          onPress={() => inputRef.current?.focus()}
+          accessibilityRole="button"
+          accessibilityLabel="Campo para código de seis dígitos"
+        >
+          <View style={styles.slotRow} pointerEvents="none">
+            {[0, 1, 2, 3, 4, 5].map((index) => (
+              <Text key={index} style={styles.slot}>
+                {normalizedCode[index] ?? '—'}
+              </Text>
+            ))}
+          </View>
+
+          <TextInput
+            ref={inputRef}
+            accessibilityLabel="Código de verificação"
+            value={normalizedCode}
+            onChangeText={(value) =>
+              setCode(value.replace(/\D/g, '').slice(0, 6))
+            }
+            keyboardType="number-pad"
+            maxLength={6}
+            caretHidden
+            autoFocus={false}
+            textContentType="oneTimeCode"
+            autoComplete="one-time-code"
+            style={styles.hiddenInput}
+          />
+        </TouchableOpacity>
+      </AuthLayout>
+
+      {popup ? (
+        <ZyraPopup
+          visible
+          {...popup}
+          onConfirm={popup.onConfirm ?? closePopup}
+          onClose={closePopup}
         />
-      </TouchableOpacity>
-    </AuthLayout>
+      ) : null}
+    </>
   );
 }
 

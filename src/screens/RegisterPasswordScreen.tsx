@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import EyeClosedIcon from '../../assets/icons/eye-closed.svg';
@@ -8,6 +8,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { AuthLayout } from '../components/AuthLayout';
 import { ZyraButton } from '../components/ZyraButton';
 import { ZyraInput } from '../components/ZyraInput';
+import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
 import { apiRequest } from '../services/api';
 import { theme } from '../styles/theme';
 
@@ -24,6 +25,16 @@ type SignUpResponse = {
   message: string;
 };
 
+function isEmailAlreadyRegistered(message: string) {
+  const lowerMessage = message.toLowerCase();
+
+  return (
+    lowerMessage.includes('email já possui uma conta') ||
+    lowerMessage.includes('email já está cadastrado') ||
+    lowerMessage.includes('already')
+  );
+}
+
 export function RegisterPasswordScreen({ navigation, route }: Props) {
   const { firstName, name, email } = route.params;
 
@@ -33,6 +44,11 @@ export function RegisterPasswordScreen({ navigation, route }: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [popup, setPopup] = useState<ZyraPopupConfig | null>(null);
+
+  function closePopup() {
+    setPopup(null);
+  }
 
   const rules: Rule[] = [
     { label: 'Pelo menos 8 caracteres', isValid: password.length >= 8 },
@@ -77,13 +93,24 @@ export function RegisterPasswordScreen({ navigation, route }: Props) {
         '[Cadastro] Signup concluído. Código solicitado ao Cognito.',
         signUpResponse.message,
       );
-      console.log('[Navegação] Direcionando usuário para verificação...');
 
-      navigation.navigate('RegisterVerification', {
-        firstName,
-        name,
-        email,
-        password,
+      setPopup({
+        variant: 'success',
+        title: 'Código enviado!',
+        message: 'Enviamos um código de confirmação para seu email.',
+        buttonText: 'Inserir código',
+        onConfirm: () => {
+          setPopup(null);
+
+          console.log('[Navegação] Direcionando usuário para verificação...');
+
+          navigation.navigate('RegisterVerification', {
+            firstName,
+            name,
+            email,
+            password,
+          });
+        },
       });
     } catch (error) {
       const message =
@@ -92,98 +119,133 @@ export function RegisterPasswordScreen({ navigation, route }: Props) {
           : 'Não foi possível criar sua conta. Tente novamente.';
 
       console.error('[Cadastro] Erro ao criar conta:', message);
-      Alert.alert('Erro no cadastro', message);
+
+      if (isEmailAlreadyRegistered(message)) {
+        setPopup({
+          variant: 'warning',
+          title: 'Este email já está cadastrado',
+          message:
+            'Entre com sua senha ou recupere o acesso caso tenha esquecido.',
+          buttonText: 'Ir para login',
+          onConfirm: () => {
+            setPopup(null);
+            navigation.navigate('Login');
+          },
+        });
+
+        return;
+      }
+
+      setPopup({
+        variant: 'error',
+        title: 'Não foi possível criar sua conta',
+        message,
+        buttonText: 'Entendi',
+      });
     } finally {
       setIsLoading(false);
     }
   }
 
   return (
-    <AuthLayout
-      title="Crie uma conta"
-      onBack={() => navigation.goBack()}
-      contentStyle={styles.content}
-      footer={
-        <ZyraButton
-          title={isLoading ? 'Criando conta...' : 'Continuar'}
-          disabled={!canContinue}
-          onPress={handleContinue}
+    <>
+      <AuthLayout
+        title="Crie uma conta"
+        onBack={() => navigation.goBack()}
+        contentStyle={styles.content}
+        footer={
+          <ZyraButton
+            title={isLoading ? 'Criando conta...' : 'Continuar'}
+            disabled={!canContinue}
+            onPress={handleContinue}
+          />
+        }
+      >
+        <ZyraInput
+          label="Senha"
+          placeholder="Digite sua senha"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!showPassword}
+          autoCapitalize="none"
+          autoCorrect={false}
+          rightAccessory={
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={
+                showPassword ? 'Ocultar senha' : 'Mostrar senha'
+              }
+              activeOpacity={0.75}
+              onPress={() => setShowPassword((currentValue) => !currentValue)}
+            >
+              {showPassword ? (
+                <EyeOpenIcon width={21} height={21} />
+              ) : (
+                <EyeClosedIcon width={21} height={21} />
+              )}
+            </TouchableOpacity>
+          }
         />
-      }
-    >
-      <ZyraInput
-        label="Senha"
-        placeholder="Digite sua senha"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry={!showPassword}
-        autoCapitalize="none"
-        autoCorrect={false}
-        rightAccessory={
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel={
-              showPassword ? 'Ocultar senha' : 'Mostrar senha'
-            }
-            activeOpacity={0.75}
-            onPress={() => setShowPassword((currentValue) => !currentValue)}
-          >
-            {showPassword ? (
-              <EyeOpenIcon width={21} height={21} />
-            ) : (
-              <EyeClosedIcon width={21} height={21} />
-            )}
-          </TouchableOpacity>
-        }
-      />
 
-      <View style={styles.validationList}>
-        {rules.map((rule) => (
-          <View key={rule.label} style={styles.ruleRow}>
-            <Text style={[styles.ruleIcon, rule.isValid && styles.ruleValid]}>
-              {rule.isValid ? '✓' : '○'}
-            </Text>
-            <Text style={[styles.ruleText, rule.isValid && styles.ruleValid]}>
-              {rule.label}
-            </Text>
-          </View>
-        ))}
-      </View>
+        <View style={styles.validationList}>
+          {rules.map((rule) => (
+            <View key={rule.label} style={styles.ruleRow}>
+              <Text style={[styles.ruleIcon, rule.isValid && styles.ruleValid]}>
+                {rule.isValid ? '✓' : '○'}
+              </Text>
+              <Text style={[styles.ruleText, rule.isValid && styles.ruleValid]}>
+                {rule.label}
+              </Text>
+            </View>
+          ))}
+        </View>
 
-      <ZyraInput
-        label="Confirmar senha"
-        placeholder="Digite a senha novamente"
-        value={confirmation}
-        onChangeText={setConfirmation}
-        onBlur={() => setConfirmationTouched(true)}
-        secureTextEntry={!showConfirmation}
-        autoCapitalize="none"
-        autoCorrect={false}
-        error={
-          confirmationTouched && !passwordsMatch
-            ? 'As senhas precisam ser iguais.'
-            : undefined
-        }
-        rightAccessory={
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel={
-              showConfirmation
-                ? 'Ocultar confirmação de senha'
-                : 'Mostrar confirmação de senha'
-            }
-            activeOpacity={0.75}
-            onPress={() => setShowConfirmation((currentValue) => !currentValue)}
-          >
-            {showConfirmation ? (
-              <EyeOpenIcon width={21} height={21} />
-            ) : (
-              <EyeClosedIcon width={21} height={21} />
-            )}
-          </TouchableOpacity>
-        }
-      />
-    </AuthLayout>
+        <ZyraInput
+          label="Confirmar senha"
+          placeholder="Digite a senha novamente"
+          value={confirmation}
+          onChangeText={setConfirmation}
+          onBlur={() => setConfirmationTouched(true)}
+          secureTextEntry={!showConfirmation}
+          autoCapitalize="none"
+          autoCorrect={false}
+          error={
+            confirmationTouched && !passwordsMatch
+              ? 'As senhas precisam ser iguais.'
+              : undefined
+          }
+          rightAccessory={
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={
+                showConfirmation
+                  ? 'Ocultar confirmação de senha'
+                  : 'Mostrar confirmação de senha'
+              }
+              activeOpacity={0.75}
+              onPress={() =>
+                setShowConfirmation((currentValue) => !currentValue)
+              }
+            >
+              {showConfirmation ? (
+                <EyeOpenIcon width={21} height={21} />
+              ) : (
+                <EyeClosedIcon width={21} height={21} />
+              )}
+            </TouchableOpacity>
+          }
+        />
+      </AuthLayout>
+
+      {popup ? (
+        <ZyraPopup
+          visible
+          {...popup}
+          onConfirm={popup.onConfirm ?? closePopup}
+          onClose={closePopup}
+        />
+      ) : null}
+    </>
   );
 }
 
