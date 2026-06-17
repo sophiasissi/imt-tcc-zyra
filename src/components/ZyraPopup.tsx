@@ -11,6 +11,7 @@ export type ZyraPopupConfig = {
   message?: string;
   buttonText?: string;
   showCloseButton?: boolean;
+  customIcon?: React.ReactNode;
   onConfirm?: () => void;
 };
 
@@ -52,6 +53,7 @@ export function ZyraPopup({
   message,
   buttonText = 'Entendi',
   showCloseButton = false,
+  customIcon,
   onConfirm,
   onClose,
 }: Props) {
@@ -82,9 +84,13 @@ export function ZyraPopup({
             </TouchableOpacity>
           ) : null}
 
-          <View style={styles.iconCircle}>
-            <Text style={styles.iconText}>{currentVariant.icon}</Text>
-          </View>
+          {customIcon ? (
+            <View style={styles.customIconWrapper}>{customIcon}</View>
+          ) : (
+            <View style={styles.iconCircle}>
+              <Text style={styles.iconText}>{currentVariant.icon}</Text>
+            </View>
+          )}
 
           <Text style={styles.title}>{title}</Text>
 
@@ -104,7 +110,7 @@ export function ZyraPopup({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.46)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 28,
@@ -177,5 +183,12 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     height: 50,
+  },
+  customIconWrapper: {
+    width: 64,
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
   },
 });

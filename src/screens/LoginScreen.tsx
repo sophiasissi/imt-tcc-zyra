@@ -3,6 +3,8 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import GoogleIcon from '../../assets/icons/googleColor.svg';
+import EyeClosedIcon from '../../assets/icons/eye-closed.svg';
+import EyeOpenIcon from '../../assets/icons/eye-open.svg';
 import { AuthLayout } from '../components/AuthLayout';
 import { ZyraButton } from '../components/ZyraButton';
 import { ZyraInput } from '../components/ZyraInput';
@@ -37,6 +39,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 export function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
+  const [showSenha, setShowSenha] = useState(false);
   const [emailTouched, setEmailTouched] = useState(false);
   const [senhaTouched, setSenhaTouched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -199,11 +202,27 @@ export function LoginScreen({ navigation }: Props) {
           value={senha}
           onChangeText={setSenha}
           onBlur={() => setSenhaTouched(true)}
-          secureTextEntry
+          secureTextEntry={!showSenha}
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="done"
           error={erroSenha}
+          rightAccessory={
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={showSenha ? 'Ocultar senha' : 'Mostrar senha'}
+              activeOpacity={0.75}
+              hitSlop={8}
+              style={styles.eyeButton}
+              onPress={() => setShowSenha((currentValue) => !currentValue)}
+            >
+              {showSenha ? (
+                <EyeOpenIcon width={21} height={21} />
+              ) : (
+                <EyeClosedIcon width={21} height={21} />
+              )}
+            </TouchableOpacity>
+          }
         />
 
         <TouchableOpacity
@@ -268,6 +287,13 @@ const styles = StyleSheet.create({
     color: theme.colors.muted2,
     fontFamily: theme.fonts.semiBold,
     fontSize: 15,
+  },
+  eyeButton: {
+    width: 44,
+    height: 44,
+    marginRight: -10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   forgotButton: {
     alignSelf: 'flex-end',
