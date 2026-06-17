@@ -11,12 +11,13 @@ import {
 import React from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
+
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { theme } from '../styles/theme';
 import CameraSvg from '../../assets/icons/camera.svg';
 import LogoColorADD from '../../assets/icons/logo_ColorADD.svg';
 import ClothesHome from '../../assets/images/clothes_home.svg';
-import Svg, { Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -69,7 +70,7 @@ function ClothingCard({ type }: ClothingCardProps) {
 }
 
 export function HomeScreen({ route, navigation }: Props) {
-  const { nome } = route.params;
+  const { accessToken, nome } = route.params;
   const { height: screenHeight } = useWindowDimensions();
 
   const expandedPanelHeight = screenHeight - EXPANDED_PANEL_TOP;
@@ -174,6 +175,11 @@ export function HomeScreen({ route, navigation }: Props) {
 
   function handleProfile() {
     console.log('[Home] Usuário acessou perfil/configurações.');
+
+    navigation.navigate('Settings', {
+      accessToken,
+      nome,
+    });
   }
 
   function handleSelectCloset() {
@@ -190,34 +196,37 @@ export function HomeScreen({ route, navigation }: Props) {
 
   return (
     <View style={styles.screen}>
-      <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background} />
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={theme.colors.background}
+      />
 
       <View style={styles.header}>
         <Text style={styles.logo}>ZYRA</Text>
 
         <View style={styles.headerActions}>
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel="Abrir informações do ColorADD"
-                activeOpacity={0.8}
-                onPress={handleColorAdd}
-              >
-                <View style={styles.colorAddOuter}>
-                  <Svg width={56} height={56} style={styles.colorAddGlowSvg}>
-                    <Defs>
-                      <RadialGradient id="g" cx="50%" cy="50%" r="50%">
-                        <Stop offset="0%" stopColor="#DE0051" stopOpacity="0.22" />
-                        <Stop offset="60%" stopColor="#DE0051" stopOpacity="0.08" />
-                        <Stop offset="100%" stopColor="#DE0051" stopOpacity="0" />
-                      </RadialGradient>
-                    </Defs>
-                    <Circle cx="28" cy="28" r="28" fill="url(#g)" />
-                  </Svg>
-                  <View style={styles.colorAddWrapper}>
-                    <LogoColorADD width={42} height={42} />
-                  </View>
-                </View>
-              </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Abrir informações do ColorADD"
+            activeOpacity={0.8}
+            onPress={handleColorAdd}
+          >
+            <View style={styles.colorAddOuter}>
+              <Svg width={56} height={56} style={styles.colorAddGlowSvg}>
+                <Defs>
+                  <RadialGradient id="g" cx="50%" cy="50%" r="50%">
+                    <Stop offset="0%" stopColor="#DE0051" stopOpacity="0.22" />
+                    <Stop offset="60%" stopColor="#DE0051" stopOpacity="0.08" />
+                    <Stop offset="100%" stopColor="#DE0051" stopOpacity="0" />
+                  </RadialGradient>
+                </Defs>
+                <Circle cx="28" cy="28" r="28" fill="url(#g)" />
+              </Svg>
+              <View style={styles.colorAddWrapper}>
+                <LogoColorADD width={42} height={42} />
+              </View>
+            </View>
+          </TouchableOpacity>
 
           <View style={styles.profileShadow}>
             <TouchableOpacity
@@ -302,7 +311,6 @@ export function HomeScreen({ route, navigation }: Props) {
           <ClothingCard type="jacket" />
           <ClothingCard type="skirt" />
         </View>
-
       </Animated.View>
 
       <View style={styles.chatContainer}>
@@ -372,7 +380,7 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     overflow: 'hidden',
-  },  
+  },
   profileGradient: {
     ...StyleSheet.absoluteFillObject,
   },

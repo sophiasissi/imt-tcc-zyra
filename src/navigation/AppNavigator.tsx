@@ -17,6 +17,10 @@ import { RegisterWelcomeScreen } from '../screens/RegisterWelcomeScreen';
 import { ForgotPasswordEmailScreen } from '../screens/ForgotPasswordEmailScreen';
 import { ForgotPasswordVerificationScreen } from '../screens/ForgotPasswordVerificationScreen';
 import { ForgotPasswordNewPasswordScreen } from '../screens/ForgotPasswordNewPasswordScreen';
+import { SettingsScreen } from '../screens/SettingsScreen';
+import { PersonalInfoScreen } from '../screens/PersonalInfoScreen';
+import { PermissionsScreen } from '../screens/PermissionsScreen';
+import { ChangePasswordScreen } from '../screens/ChangePasswordScreen';
 
 export type GeneroCadastro =
   | 'MASCULINO'
@@ -100,6 +104,22 @@ export type RootStackParamList = {
   Chat: {
     nome?: string | null;
   };
+
+  Settings: {
+    accessToken: string;
+    nome?: string | null;
+  };
+
+  PersonalInfo: {
+    accessToken: string;
+    nome?: string | null;
+  };
+
+  Permissions: undefined;
+
+  ChangePassword: {
+    accessToken: string;
+  };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -156,6 +176,7 @@ export function AppNavigator() {
           component={ForgotPasswordNewPasswordScreen}
         />
         <Stack.Screen name="Home" component={HomeScreen} />
+
         <Stack.Screen
           name="Chat"
           component={ChatScreen}
@@ -166,6 +187,12 @@ export function AppNavigator() {
             gestureEnabled: false,
           }}
         />
+
+        <Stack.Screen name="Settings" component={SettingsScreen} />
+
+        <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
+        <Stack.Screen name="Permissions" component={PermissionsScreen} />
+        <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -50,6 +50,25 @@ export function RegisterPasswordScreen({ navigation, route }: Props) {
     setPopup(null);
   }
 
+  function renderEyeButton(isVisible: boolean, onPress: () => void) {
+    return (
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel={isVisible ? 'Ocultar senha' : 'Mostrar senha'}
+        activeOpacity={0.75}
+        hitSlop={8}
+        style={styles.eyeButton}
+        onPress={onPress}
+      >
+        {isVisible ? (
+          <EyeOpenIcon width={21} height={21} />
+        ) : (
+          <EyeClosedIcon width={21} height={21} />
+        )}
+      </TouchableOpacity>
+    );
+  }
+
   const rules: Rule[] = [
     { label: 'Pelo menos 8 caracteres', isValid: password.length >= 8 },
     {
@@ -169,22 +188,9 @@ export function RegisterPasswordScreen({ navigation, route }: Props) {
           secureTextEntry={!showPassword}
           autoCapitalize="none"
           autoCorrect={false}
-          rightAccessory={
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel={
-                showPassword ? 'Ocultar senha' : 'Mostrar senha'
-              }
-              activeOpacity={0.75}
-              onPress={() => setShowPassword((currentValue) => !currentValue)}
-            >
-              {showPassword ? (
-                <EyeOpenIcon width={21} height={21} />
-              ) : (
-                <EyeClosedIcon width={21} height={21} />
-              )}
-            </TouchableOpacity>
-          }
+          rightAccessory={renderEyeButton(showPassword, () =>
+            setShowPassword((currentValue) => !currentValue),
+          )}
         />
 
         <View style={styles.validationList}>
@@ -214,26 +220,9 @@ export function RegisterPasswordScreen({ navigation, route }: Props) {
               ? 'As senhas precisam ser iguais.'
               : undefined
           }
-          rightAccessory={
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel={
-                showConfirmation
-                  ? 'Ocultar confirmação de senha'
-                  : 'Mostrar confirmação de senha'
-              }
-              activeOpacity={0.75}
-              onPress={() =>
-                setShowConfirmation((currentValue) => !currentValue)
-              }
-            >
-              {showConfirmation ? (
-                <EyeOpenIcon width={21} height={21} />
-              ) : (
-                <EyeClosedIcon width={21} height={21} />
-              )}
-            </TouchableOpacity>
-          }
+          rightAccessory={renderEyeButton(showConfirmation, () =>
+            setShowConfirmation((currentValue) => !currentValue),
+          )}
         />
       </AuthLayout>
 
@@ -276,5 +265,12 @@ const styles = StyleSheet.create({
   },
   ruleValid: {
     color: theme.colors.primary,
+  },
+  eyeButton: {
+    width: 44,
+    height: 44,
+    marginRight: -10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
