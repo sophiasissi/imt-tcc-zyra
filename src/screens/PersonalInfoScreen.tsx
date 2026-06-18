@@ -414,7 +414,9 @@ export function PersonalInfoScreen({ navigation }: Props) {
                     style={styles.editorInput}
                   />
 
-                  <Text style={styles.editorHint}>Use o formato DD/MM/AAAA.</Text>
+                  <Text style={styles.editorHint}>
+                    Use o formato DD/MM/AAAA.
+                  </Text>
                 </>
               ) : null}
 
@@ -428,7 +430,8 @@ export function PersonalInfoScreen({ navigation }: Props) {
                       activeOpacity={0.8}
                       style={[
                         styles.optionItem,
-                        draftValue === option.value && styles.optionItemSelected,
+                        draftValue === option.value &&
+                          styles.optionItemSelected,
                       ]}
                       onPress={() => setDraftValue(option.value)}
                     >
@@ -456,7 +459,8 @@ export function PersonalInfoScreen({ navigation }: Props) {
                       activeOpacity={0.8}
                       style={[
                         styles.optionItem,
-                        draftValue === option.value && styles.optionItemSelected,
+                        draftValue === option.value &&
+                          styles.optionItemSelected,
                       ]}
                       onPress={() => setDraftValue(option.value)}
                     >

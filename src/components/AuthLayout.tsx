@@ -43,7 +43,9 @@ export function AuthLayout({
   contentStyle,
   titleStyle,
 }: Props) {
-  const hasDefaultFooterButton = Boolean(footerButtonTitle && onFooterButtonPress);
+  const hasDefaultFooterButton = Boolean(
+    footerButtonTitle && onFooterButtonPress,
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -64,7 +66,9 @@ export function AuthLayout({
                 <BackArrowIcon width={26} height={26} />
               </TouchableOpacity>
             ) : null}
-            {title ? <Text style={[styles.title, titleStyle]}>{title}</Text> : null}
+            {title ? (
+              <Text style={[styles.title, titleStyle]}>{title}</Text>
+            ) : null}
           </View>
         ) : null}
 
@@ -76,7 +80,9 @@ export function AuthLayout({
             contentStyle,
           ]}
           keyboardShouldPersistTaps="never"
-          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          keyboardDismissMode={
+            Platform.OS === 'ios' ? 'interactive' : 'on-drag'
+          }
           onScrollBeginDrag={Keyboard.dismiss}
           showsVerticalScrollIndicator={false}
         >

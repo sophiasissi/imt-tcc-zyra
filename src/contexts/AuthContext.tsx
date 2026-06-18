@@ -1,6 +1,7 @@
 import {
   createContext,
   PropsWithChildren,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -54,6 +55,45 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const isAuthenticated = Boolean(tokens?.accessToken && user);
 
+  const clearSessionState = useCallback(async () => {
+    setTokens(null);
+    setUser(null);
+    await clearAuthTokens();
+  }, []);
+
+  const refreshStoredSession = useCallback(
+    async (currentTokens: StoredAuthTokens) => {
+      try {
+        const response = await apiRequest<RefreshTokenResponse>(
+          '/auth/refresh-token',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              refreshToken: currentTokens.refreshToken,
+            }),
+          },
+        );
+
+        const nextTokens: StoredAuthTokens = {
+          accessToken: response.accessToken,
+          idToken: response.idToken,
+          refreshToken: response.refreshToken ?? currentTokens.refreshToken,
+          expiresIn: response.expiresIn,
+          tokenType: response.tokenType,
+        };
+
+        await saveAuthTokens(nextTokens);
+        setTokens(nextTokens);
+
+        return nextTokens;
+      } catch (error) {
+        console.error('[Sessão] Não foi possível renovar a sessão:', error);
+        return null;
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     async function restoreSession() {
       try {
@@ -98,51 +138,18 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
 
     void restoreSession();
-  }, []);
+  }, [clearSessionState, refreshStoredSession]);
 
-  async function clearSessionState() {
-    setTokens(null);
-    setUser(null);
-    await clearAuthTokens();
-  }
-
-  async function refreshStoredSession(currentTokens: StoredAuthTokens) {
-    try {
-      const response = await apiRequest<RefreshTokenResponse>(
-        '/auth/refresh-token',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            refreshToken: currentTokens.refreshToken,
-          }),
-        },
-      );
-
-      const nextTokens: StoredAuthTokens = {
-        accessToken: response.accessToken,
-        idToken: response.idToken,
-        refreshToken: response.refreshToken ?? currentTokens.refreshToken,
-        expiresIn: response.expiresIn,
-        tokenType: response.tokenType,
-      };
-
+  const signIn = useCallback(
+    async (nextTokens: StoredAuthTokens, nextUser: UserProfile) => {
       await saveAuthTokens(nextTokens);
       setTokens(nextTokens);
+      setUser(nextUser);
+    },
+    [],
+  );
 
-      return nextTokens;
-    } catch (error) {
-      console.error('[Sessão] Não foi possível renovar a sessão:', error);
-      return null;
-    }
-  }
-
-  async function signIn(nextTokens: StoredAuthTokens, nextUser: UserProfile) {
-    await saveAuthTokens(nextTokens);
-    setTokens(nextTokens);
-    setUser(nextUser);
-  }
-
-  async function signOut() {
+  const signOut = useCallback(async () => {
     try {
       const storedTokens = await getAuthTokens();
       const accessToken = tokens?.accessToken || storedTokens?.accessToken;
@@ -165,17 +172,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
     } finally {
       await clearSessionState();
     }
-  }
+  }, [tokens?.accessToken, clearSessionState]);
 
-  async function refreshSession() {
+  const refreshSession = useCallback(async () => {
     if (!tokens) {
       return null;
     }
 
     return refreshStoredSession(tokens);
-  }
+  }, [tokens, refreshStoredSession]);
 
-  function updateUser(nextUserData: Partial<UserProfile>) {
+  const updateUser = useCallback((nextUserData: Partial<UserProfile>) => {
     setUser((currentUser) => {
       if (!currentUser) {
         return currentUser;
@@ -186,7 +193,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         ...nextUserData,
       };
     });
-  }
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -199,7 +206,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
       refreshSession,
       updateUser,
     }),
-    [tokens, user, isRestoringSession, isAuthenticated],
+    [
+      tokens,
+      user,
+      isRestoringSession,
+      isAuthenticated,
+      signIn,
+      signOut,
+      refreshSession,
+      updateUser,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

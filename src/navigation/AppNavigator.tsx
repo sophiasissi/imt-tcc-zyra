@@ -63,9 +63,11 @@ export type RootStackParamList = {
     accessToken?: string;
   };
 
-  RegisterBirthDate: {
-    accessToken?: string;
-  };
+  RegisterBirthDate:
+    | {
+        accessToken?: string;
+      }
+    | undefined;
 
   RegisterGender: {
     accessToken?: string;
@@ -98,12 +100,7 @@ export type RootStackParamList = {
     confirmationCode: string;
   };
 
-  Home:
-    | {
-        accessToken?: string;
-        nome?: string | null;
-      }
-    | undefined;
+  Home: undefined;
 
   Chat: {
     nome?: string | null;

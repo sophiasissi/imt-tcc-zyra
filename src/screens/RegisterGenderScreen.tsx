@@ -2,10 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import {
-  GeneroCadastro,
-  RootStackParamList,
-} from '../navigation/AppNavigator';
+import { GeneroCadastro, RootStackParamList } from '../navigation/AppNavigator';
 import { AuthLayout } from '../components/AuthLayout';
 import { OptionPill } from '../components/OptionPill';
 import { ZyraButton } from '../components/ZyraButton';
@@ -25,7 +22,7 @@ const options: GenderOption[] = [
 ];
 
 export function RegisterGenderScreen({ navigation, route }: Props) {
-  const { accessToken, dataNascimento } = route.params;
+  const { dataNascimento } = route.params;
 
   const [selected, setSelected] = useState<GeneroCadastro | null>(null);
 
@@ -37,7 +34,6 @@ export function RegisterGenderScreen({ navigation, route }: Props) {
     console.log('[Onboarding] Gênero selecionado:', selected);
 
     navigation.navigate('RegisterColorBlindness', {
-      accessToken,
       dataNascimento,
       genero: selected,
     });
@@ -47,7 +43,6 @@ export function RegisterGenderScreen({ navigation, route }: Props) {
     console.log('[Onboarding] Usuário preferiu não informar gênero.');
 
     navigation.navigate('RegisterColorBlindness', {
-      accessToken,
       dataNascimento,
       genero: 'PREFIRO_NAO_DIZER',
     });

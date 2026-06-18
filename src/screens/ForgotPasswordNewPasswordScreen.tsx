@@ -28,10 +28,7 @@ type ConfirmForgotPasswordResponse = {
   message: string;
 };
 
-export function ForgotPasswordNewPasswordScreen({
-  navigation,
-  route,
-}: Props) {
+export function ForgotPasswordNewPasswordScreen({ navigation, route }: Props) {
   const { email, confirmationCode } = route.params;
 
   const [password, setPassword] = useState('');
@@ -77,18 +74,17 @@ export function ForgotPasswordNewPasswordScreen({
 
       console.log('[Recuperação] Enviando código e nova senha ao Cognito...');
 
-      const response =
-        await apiRequest<ConfirmForgotPasswordResponse>(
-          '/auth/confirm-forgot-password',
-          {
-            method: 'POST',
-            body: JSON.stringify({
-              email,
-              confirmationCode,
-              newPassword: password,
-            }),
-          },
-        );
+      const response = await apiRequest<ConfirmForgotPasswordResponse>(
+        '/auth/confirm-forgot-password',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            email,
+            confirmationCode,
+            newPassword: password,
+          }),
+        },
+      );
 
       console.log(
         '[Recuperação] Senha redefinida com sucesso.',
@@ -98,7 +94,8 @@ export function ForgotPasswordNewPasswordScreen({
       setPopup({
         variant: 'success',
         title: 'Senha alterada!',
-        message: 'Sua senha foi redefinida com sucesso. Entre usando a nova senha.',
+        message:
+          'Sua senha foi redefinida com sucesso. Entre usando a nova senha.',
         buttonText: 'Ir para login',
         onConfirm: () => {
           setPopup(null);

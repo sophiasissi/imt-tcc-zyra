@@ -13,7 +13,9 @@ function normalizeApiMessage(message: unknown) {
     return 'Não foi possível concluir a solicitação. Tente novamente.';
   }
 
-  const rawMessage = Array.isArray(message) ? message.join('\n') : String(message);
+  const rawMessage = Array.isArray(message)
+    ? message.join('\n')
+    : String(message);
 
   const lowerMessage = rawMessage.toLowerCase();
 

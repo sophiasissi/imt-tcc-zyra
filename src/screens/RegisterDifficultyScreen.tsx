@@ -26,9 +26,10 @@ type UpdateProfileResponse = {
 const numbers = [0, 1, 2, 3, 4, 5];
 
 export function RegisterDifficultyScreen({ navigation, route }: Props) {
-  const { updateUser } = useAuth();
+  const { tokens, updateUser } = useAuth();
 
-  const { accessToken, dataNascimento, genero, tipoDaltonismo } = route.params;
+  const { dataNascimento, genero, tipoDaltonismo } = route.params;
+  const accessToken = tokens?.accessToken ?? '';
 
   const [selected, setSelected] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -86,15 +87,7 @@ export function RegisterDifficultyScreen({ navigation, route }: Props) {
 
           navigation.reset({
             index: 0,
-            routes: [
-              {
-                name: 'Home',
-                params: {
-                  accessToken,
-                  nome: response.nome,
-                },
-              },
-            ],
+            routes: [{ name: 'Home' }],
           });
         },
       });

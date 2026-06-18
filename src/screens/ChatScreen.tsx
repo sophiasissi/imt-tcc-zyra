@@ -297,7 +297,7 @@ export function ChatScreen({ navigation }: Props) {
       return;
     }
 
-    setMessages(currentMessages => [
+    setMessages((currentMessages) => [
       ...currentMessages,
       {
         id: `user-${Date.now()}`,
@@ -364,12 +364,9 @@ export function ChatScreen({ navigation }: Props) {
           </View>
 
           <Animated.View
-            style={[
-              styles.messagesContainer,
-              { opacity: conversationOpacity },
-            ]}
+            style={[styles.messagesContainer, { opacity: conversationOpacity }]}
           >
-            {messages.map(message =>
+            {messages.map((message) =>
               message.author === 'zyra' ? (
                 <View key={message.id} style={styles.zyraMessageRow}>
                   <View style={styles.messageIndicatorShadow}>

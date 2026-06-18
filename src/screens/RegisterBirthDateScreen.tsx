@@ -37,9 +37,7 @@ function formatDateForApi(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-export function RegisterBirthDateScreen({ navigation, route }: Props) {
-  const { accessToken } = route.params;
-
+export function RegisterBirthDateScreen({ navigation }: Props) {
   const [date, setDate] = useState<Date | null>(null);
   const [showPicker, setShowPicker] = useState(false);
 
@@ -68,7 +66,6 @@ export function RegisterBirthDateScreen({ navigation, route }: Props) {
     console.log('[Onboarding] Enviando data de nascimento para próxima etapa.');
 
     navigation.navigate('RegisterGender', {
-      accessToken,
       dataNascimento,
     });
   }
@@ -100,10 +97,7 @@ export function RegisterBirthDateScreen({ navigation, route }: Props) {
         onPress={() => setShowPicker(true)}
       >
         <Text
-          style={[
-            styles.dateText,
-            date ? styles.dateTextSelected : undefined,
-          ]}
+          style={[styles.dateText, date ? styles.dateTextSelected : undefined]}
         >
           {date ? formatDate(date) : 'Selecione sua data de nascimento'}
         </Text>

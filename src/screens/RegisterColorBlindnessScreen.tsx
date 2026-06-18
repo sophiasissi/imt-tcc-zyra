@@ -38,11 +38,8 @@ const options: ColorBlindnessOption[] = [
   { label: 'Não sei', value: 'NAO_SEI' },
 ];
 
-export function RegisterColorBlindnessScreen({
-  navigation,
-  route,
-}: Props) {
-  const { accessToken, dataNascimento, genero } = route.params;
+export function RegisterColorBlindnessScreen({ navigation, route }: Props) {
+  const { dataNascimento, genero } = route.params;
 
   const [selected, setSelected] = useState<ColorBlindnessOption | null>(null);
   const [open, setOpen] = useState(false);
@@ -60,7 +57,6 @@ export function RegisterColorBlindnessScreen({
     }
 
     navigation.navigate('RegisterDifficulty', {
-      accessToken,
       dataNascimento,
       genero,
       tipoDaltonismo: selected.value,
@@ -71,7 +67,6 @@ export function RegisterColorBlindnessScreen({
     console.log('[Onboarding] Tipo de daltonismo não informado.');
 
     navigation.navigate('RegisterDifficulty', {
-      accessToken,
       dataNascimento,
       genero,
     });

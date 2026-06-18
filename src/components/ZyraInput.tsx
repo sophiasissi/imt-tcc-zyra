@@ -1,5 +1,11 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  TextInput,
+  TextInputProps,
+  View,
+} from 'react-native';
 
 import { theme } from '../styles/theme';
 
@@ -9,7 +15,13 @@ type Props = TextInputProps & {
   rightAccessory?: ReactNode;
 };
 
-export function ZyraInput({ label, error, rightAccessory, style, ...props }: Props) {
+export function ZyraInput({
+  label,
+  error,
+  rightAccessory,
+  style,
+  ...props
+}: Props) {
   return (
     <View style={styles.wrapper}>
       <Text style={styles.label}>{label}</Text>
@@ -17,10 +29,16 @@ export function ZyraInput({ label, error, rightAccessory, style, ...props }: Pro
         <TextInput
           accessibilityLabel={label}
           placeholderTextColor={theme.colors.inputText}
-          style={[styles.input, rightAccessory ? styles.inputWithAccessory : undefined, style]}
+          style={[
+            styles.input,
+            rightAccessory ? styles.inputWithAccessory : undefined,
+            style,
+          ]}
           {...props}
         />
-        {rightAccessory ? <View style={styles.rightAccessory}>{rightAccessory}</View> : null}
+        {rightAccessory ? (
+          <View style={styles.rightAccessory}>{rightAccessory}</View>
+        ) : null}
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>

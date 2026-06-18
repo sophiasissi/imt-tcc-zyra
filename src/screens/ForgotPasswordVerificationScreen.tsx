@@ -18,10 +18,7 @@ type Props = NativeStackScreenProps<
   'ForgotPasswordVerification'
 >;
 
-export function ForgotPasswordVerificationScreen({
-  navigation,
-  route,
-}: Props) {
+export function ForgotPasswordVerificationScreen({ navigation, route }: Props) {
   const { email } = route.params;
 
   const [code, setCode] = useState('');

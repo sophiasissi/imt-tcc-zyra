@@ -84,6 +84,7 @@ Backend API (NestJS)
  ├── OpenAI API (IA)
  └── Serviço de visão computacional (Python/OpenCV)
 ```
+
 ---
 
 ## 📚 Materiais complementares relevantes

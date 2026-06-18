@@ -106,15 +106,7 @@ export function LoginScreen({ navigation }: Props) {
 
       navigation.reset({
         index: 0,
-        routes: [
-          {
-            name: 'Home',
-            params: {
-              accessToken: loginResponse.accessToken,
-              nome: profileResponse.nome,
-            },
-          },
-        ],
+        routes: [{ name: 'Home' }],
       });
     } catch (error) {
       const rawMessage =
@@ -122,7 +114,10 @@ export function LoginScreen({ navigation }: Props) {
           ? error.message
           : 'Não foi possível entrar na sua conta.';
 
-      console.error('[Login] Erro ao autenticar ou localizar perfil:', rawMessage);
+      console.error(
+        '[Login] Erro ao autenticar ou localizar perfil:',
+        rawMessage,
+      );
 
       const message = rawMessage.includes('conectar ao servidor')
         ? rawMessage

@@ -85,14 +85,16 @@ export function RegisterVerificationScreen({ navigation, route }: Props) {
 
       console.log('[Verificação] Enviando código para confirmação...');
 
-      const confirmResponse =
-        await apiRequest<ConfirmSignUpResponse>('/auth/confirm-signup', {
+      const confirmResponse = await apiRequest<ConfirmSignUpResponse>(
+        '/auth/confirm-signup',
+        {
           method: 'POST',
           body: JSON.stringify({
             email,
             confirmationCode: normalizedCode,
           }),
-        });
+        },
+      );
 
       console.log(
         '[Verificação] Conta confirmada com sucesso.',
@@ -125,15 +127,17 @@ export function RegisterVerificationScreen({ navigation, route }: Props) {
 
       console.log('[Perfil] Iniciando criação do perfil inicial...');
 
-      const profileResponse =
-        await apiRequest<RegisterProfileResponse>('/auth/register-profile', {
+      const profileResponse = await apiRequest<RegisterProfileResponse>(
+        '/auth/register-profile',
+        {
           method: 'POST',
           token: loginResponse.accessToken,
           body: JSON.stringify({
             nome: name,
             email,
           }),
-        });
+        },
+      );
 
       await signIn(loginResponse, {
         id: profileResponse.id,

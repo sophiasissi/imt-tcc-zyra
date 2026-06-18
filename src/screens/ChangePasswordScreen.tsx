@@ -222,13 +222,19 @@ export function ChangePasswordScreen({ navigation }: Props) {
                 {rules.map((rule) => (
                   <View key={rule.label} style={styles.ruleRow}>
                     <Text
-                      style={[styles.ruleIcon, rule.isValid && styles.ruleValid]}
+                      style={[
+                        styles.ruleIcon,
+                        rule.isValid && styles.ruleValid,
+                      ]}
                     >
                       {rule.isValid ? '✓' : '○'}
                     </Text>
 
                     <Text
-                      style={[styles.ruleText, rule.isValid && styles.ruleValid]}
+                      style={[
+                        styles.ruleText,
+                        rule.isValid && styles.ruleValid,
+                      ]}
                     >
                       {rule.label}
                     </Text>
