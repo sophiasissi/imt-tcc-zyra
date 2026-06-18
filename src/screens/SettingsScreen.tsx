@@ -11,6 +11,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { theme } from '../styles/theme';
+import { ZyraPopup } from '../components/ZyraPopup';
+import { useAuth } from '../contexts/AuthContext';
 
 import BackIcon from '../../assets/icons/backArrow.svg';
 import LogoColorADD from '../../assets/icons/logo_ColorADD.svg';
@@ -20,7 +22,6 @@ import LockIcon from '../../assets/icons/padlock-lock-svgrepo-com.svg';
 import ShieldIcon from '../../assets/icons/security-verified-svgrepo-com.svg';
 import ArrowRightIcon from '../../assets/icons/right-arrow-svgrepo-com.svg';
 import LogoutIcon from '../../assets/icons/logout-svgrepo-com.svg';
-import { ZyraPopup } from '../components/ZyraPopup';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
@@ -52,21 +53,30 @@ function MenuItem({ title, icon, onPress, danger = false }: MenuItemProps) {
   );
 }
 
-export function SettingsScreen({ navigation, route }: Props) {
-  const { accessToken, nome } = route.params;
+export function SettingsScreen({ navigation }: Props) {
+  const { signOut, user } = useAuth();
+
   const [exitModalVisible, setExitModalVisible] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const displayName = nome ?? 'Nome do Usuário';
+  const displayName = user?.nome ?? 'Nome do Usuário';
 
-  function handleLogout() {
-    setExitModalVisible(false);
+  async function handleLogout() {
+    try {
+      setIsLoggingOut(true);
+      setExitModalVisible(false);
 
-    console.log('[Configurações] Usuário saiu da conta.');
+      console.log('[Configurações] Usuário saiu da conta.');
 
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Intro' }],
-    });
+      await signOut();
+
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Intro' }],
+      });
+    } finally {
+      setIsLoggingOut(false);
+    }
   }
 
   return (
@@ -109,12 +119,7 @@ export function SettingsScreen({ navigation, route }: Props) {
           <MenuItem
             title="Informações pessoais"
             icon={<UserIcon width={24} height={24} />}
-            onPress={() =>
-              navigation.navigate('PersonalInfo', {
-                accessToken,
-                nome,
-              })
-            }
+            onPress={() => navigation.navigate('PersonalInfo')}
           />
         </View>
 
@@ -134,11 +139,7 @@ export function SettingsScreen({ navigation, route }: Props) {
           <MenuItem
             title="Alterar senha"
             icon={<LockIcon width={24} height={24} />}
-            onPress={() =>
-              navigation.navigate('ChangePassword', {
-                accessToken,
-              })
-            }
+            onPress={() => navigation.navigate('ChangePassword')}
           />
 
           <MenuItem
@@ -158,13 +159,18 @@ export function SettingsScreen({ navigation, route }: Props) {
 
         <View style={styles.logoutArea}>
           <MenuItem
-            title="Sair"
+            title={isLoggingOut ? 'Saindo...' : 'Sair'}
             danger
             icon={<LogoutIcon width={24} height={24} />}
-            onPress={() => setExitModalVisible(true)}
+            onPress={() => {
+              if (!isLoggingOut) {
+                setExitModalVisible(true);
+              }
+            }}
           />
         </View>
       </View>
+
       {exitModalVisible ? (
         <ZyraPopup
           visible

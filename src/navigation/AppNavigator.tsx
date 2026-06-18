@@ -21,6 +21,8 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { PersonalInfoScreen } from '../screens/PersonalInfoScreen';
 import { PermissionsScreen } from '../screens/PermissionsScreen';
 import { ChangePasswordScreen } from '../screens/ChangePasswordScreen';
+import { SplashScreen } from '../screens/SplashScreen';
+import { useAuth } from '../contexts/AuthContext';
 
 export type GeneroCadastro =
   | 'MASCULINO'
@@ -96,85 +98,98 @@ export type RootStackParamList = {
     confirmationCode: string;
   };
 
-  Home: {
-    accessToken: string;
-    nome?: string | null;
-  };
+  Home:
+    | {
+        accessToken?: string;
+        nome?: string | null;
+      }
+    | undefined;
 
   Chat: {
     nome?: string | null;
   };
 
-  Settings: {
-    accessToken: string;
-    nome?: string | null;
-  };
+  Settings: undefined;
 
-  PersonalInfo: {
-    accessToken: string;
-    nome?: string | null;
-  };
+  PersonalInfo: undefined;
 
   Permissions: undefined;
 
-  ChangePassword: {
-    accessToken: string;
-  };
+  ChangePassword: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function AppNavigator() {
+  const { isRestoringSession, isAuthenticated } = useAuth();
+
+  if (isRestoringSession) {
+    return <SplashScreen />;
+  }
+
   return (
     <NavigationContainer>
       <Stack.Navigator
         screenOptions={{ headerShown: false }}
-        initialRouteName="Intro"
+        initialRouteName={isAuthenticated ? 'Home' : 'Intro'}
       >
         <Stack.Screen name="Intro" component={IntroScreen} />
         <Stack.Screen name="RegisterStart" component={RegisterStartScreen} />
+
         <Stack.Screen
           name="RegisterBasicInfo"
           component={RegisterBasicInfoScreen}
         />
+
         <Stack.Screen
           name="RegisterPassword"
           component={RegisterPasswordScreen}
         />
+
         <Stack.Screen
           name="RegisterVerification"
           component={RegisterVerificationScreen}
         />
+
         <Stack.Screen
           name="RegisterWelcome"
           component={RegisterWelcomeScreen}
         />
+
         <Stack.Screen
           name="RegisterBirthDate"
           component={RegisterBirthDateScreen}
         />
+
         <Stack.Screen name="RegisterGender" component={RegisterGenderScreen} />
+
         <Stack.Screen
           name="RegisterColorBlindness"
           component={RegisterColorBlindnessScreen}
         />
+
         <Stack.Screen
           name="RegisterDifficulty"
           component={RegisterDifficultyScreen}
         />
+
         <Stack.Screen name="Login" component={LoginScreen} />
+
         <Stack.Screen
           name="ForgotPasswordEmail"
           component={ForgotPasswordEmailScreen}
         />
+
         <Stack.Screen
           name="ForgotPasswordVerification"
           component={ForgotPasswordVerificationScreen}
         />
+
         <Stack.Screen
           name="ForgotPasswordNewPassword"
           component={ForgotPasswordNewPasswordScreen}
         />
+
         <Stack.Screen name="Home" component={HomeScreen} />
 
         <Stack.Screen
@@ -189,7 +204,6 @@ export function AppNavigator() {
         />
 
         <Stack.Screen name="Settings" component={SettingsScreen} />
-
         <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
         <Stack.Screen name="Permissions" component={PermissionsScreen} />
         <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />

@@ -8,13 +8,15 @@ import { ZyraButton } from '../components/ZyraButton';
 import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
 import { apiRequest } from '../services/api';
 import { theme } from '../styles/theme';
+import { useAuth } from '../contexts/AuthContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterDifficulty'>;
 
 type UpdateProfileResponse = {
   id: string;
   cognitoSub: string;
-  nome?: string | null;
+  nome: string | null;
+  email: string | null;
   dataNascimento: string | null;
   genero: string | null;
   tipoDaltonismo: string | null;
@@ -24,6 +26,8 @@ type UpdateProfileResponse = {
 const numbers = [0, 1, 2, 3, 4, 5];
 
 export function RegisterDifficultyScreen({ navigation, route }: Props) {
+  const { updateUser } = useAuth();
+
   const { accessToken, dataNascimento, genero, tipoDaltonismo } = route.params;
 
   const [selected, setSelected] = useState<number | null>(null);
@@ -66,6 +70,8 @@ export function RegisterDifficultyScreen({ navigation, route }: Props) {
         token: accessToken,
         body: JSON.stringify(payload),
       });
+
+      updateUser(response);
 
       console.log('[Onboarding] Perfil complementar atualizado com sucesso.');
 

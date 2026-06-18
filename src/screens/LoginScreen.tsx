@@ -12,6 +12,7 @@ import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { apiRequest } from '../services/api';
 import { theme } from '../styles/theme';
+import { useAuth } from '../contexts/AuthContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -37,6 +38,8 @@ type UserProfileResponse = {
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export function LoginScreen({ navigation }: Props) {
+  const { signIn } = useAuth();
+
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [showSenha, setShowSenha] = useState(false);
@@ -95,6 +98,8 @@ export function LoginScreen({ navigation }: Props) {
           token: loginResponse.accessToken,
         },
       );
+
+      await signIn(loginResponse, profileResponse);
 
       console.log('[Login] Perfil localizado com sucesso.');
       console.log('[Login] Direcionando usuário para a Home...');

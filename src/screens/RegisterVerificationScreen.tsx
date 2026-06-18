@@ -14,6 +14,7 @@ import { ZyraButton } from '../components/ZyraButton';
 import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
 import { apiRequest } from '../services/api';
 import { theme } from '../styles/theme';
+import { useAuth } from '../contexts/AuthContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterVerification'>;
 
@@ -56,6 +57,8 @@ function isEmailAlreadyRegistered(message: string) {
 }
 
 export function RegisterVerificationScreen({ navigation, route }: Props) {
+  const { signIn } = useAuth();
+
   const { firstName, name, email, password } = route.params;
 
   const [code, setCode] = useState('');
@@ -131,6 +134,17 @@ export function RegisterVerificationScreen({ navigation, route }: Props) {
             email,
           }),
         });
+
+      await signIn(loginResponse, {
+        id: profileResponse.id,
+        cognitoSub: profileResponse.cognitoSub,
+        nome: profileResponse.nome,
+        email: profileResponse.email,
+        dataNascimento: null,
+        genero: null,
+        tipoDaltonismo: null,
+        nivelDificuldadeLooks: null,
+      });
 
       console.log('[Perfil] Perfil inicial salvo no PostgreSQL.');
       console.log('[Perfil] ID interno recebido:', Boolean(profileResponse.id));

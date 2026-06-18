@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useFonts } from 'expo-font';
+
 import { SplashScreen } from './src/screens/SplashScreen';
 import { AppNavigator } from './src/navigation/AppNavigator';
+import { AuthProvider } from './src/contexts/AuthContext';
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -34,5 +36,9 @@ export default function App() {
     return <SplashScreen />;
   }
 
-  return <AppNavigator />;
+  return (
+    <AuthProvider>
+      <AppNavigator />
+    </AuthProvider>
+  );
 }
