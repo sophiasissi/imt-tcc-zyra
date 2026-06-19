@@ -334,7 +334,10 @@ export function HomeScreen({ navigation }: Props) {
             accessibilityLabel="Abrir câmera"
             activeOpacity={0.8}
             style={styles.cameraButton}
-            onPress={handleCamera}
+            onPress={(event) => {
+              event.stopPropagation();
+              handleCamera();
+            }}
           >
             <CameraSvg width={24} height={24} />
           </TouchableOpacity>

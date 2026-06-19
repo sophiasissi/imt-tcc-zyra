@@ -327,7 +327,7 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
           style={styles.bottomIconButton}
           onPress={() => console.log('[Câmera] Galeria ainda não integrada.')}
         >
-          <GalleryIcon width={34} height={34} color="#FFFFFF" />
+          <GalleryIcon width={52} height={52} color="#FFFFFF" />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -347,7 +347,7 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
           style={styles.bottomIconButton}
           onPress={handleSwitchCamera}
         >
-          <SwitchCameraIcon width={36} height={36} color="#FFFFFF" />
+          <SwitchCameraIcon width={52} height={52} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
     </View>
