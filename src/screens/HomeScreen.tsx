@@ -193,6 +193,8 @@ export function HomeScreen({ navigation }: Props) {
 
   function handleCamera() {
     console.log('[Home] Usuário acessou a câmera.');
+
+    navigation.navigate('CameraColorDetection');
   }
 
   return (

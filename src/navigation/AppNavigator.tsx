@@ -23,6 +23,7 @@ import { PermissionsScreen } from '../screens/PermissionsScreen';
 import { ChangePasswordScreen } from '../screens/ChangePasswordScreen';
 import { SplashScreen } from '../screens/SplashScreen';
 import { useAuth } from '../contexts/AuthContext';
+import { CameraColorDetectionScreen } from '../screens/CameraColorDetectionScreen';
 
 export type GeneroCadastro =
   | 'MASCULINO'
@@ -113,6 +114,8 @@ export type RootStackParamList = {
   Permissions: undefined;
 
   ChangePassword: undefined;
+
+  CameraColorDetection: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -189,6 +192,11 @@ export function AppNavigator() {
 
         <Stack.Screen name="Home" component={HomeScreen} />
 
+        <Stack.Screen
+          name="CameraColorDetection"
+          component={CameraColorDetectionScreen}
+        />
+        
         <Stack.Screen
           name="Chat"
           component={ChatScreen}
