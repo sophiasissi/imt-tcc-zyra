@@ -21,6 +21,10 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { PersonalInfoScreen } from '../screens/PersonalInfoScreen';
 import { PermissionsScreen } from '../screens/PermissionsScreen';
 import { ChangePasswordScreen } from '../screens/ChangePasswordScreen';
+import { SplashScreen } from '../screens/SplashScreen';
+import { useAuth } from '../contexts/AuthContext';
+import { CameraColorDetectionScreen } from '../screens/CameraColorDetectionScreen';
+import { CapturedClothingScreen } from '../screens/CapturedClothingScreen';
 
 export type GeneroCadastro =
   | 'MASCULINO'
@@ -61,9 +65,11 @@ export type RootStackParamList = {
     accessToken?: string;
   };
 
-  RegisterBirthDate: {
-    accessToken?: string;
-  };
+  RegisterBirthDate:
+    | {
+        accessToken?: string;
+      }
+    | undefined;
 
   RegisterGender: {
     accessToken?: string;
@@ -96,86 +102,112 @@ export type RootStackParamList = {
     confirmationCode: string;
   };
 
-  Home: {
-    accessToken: string;
-    nome?: string | null;
-  };
+  Home: undefined;
 
   Chat: {
     nome?: string | null;
   };
 
-  Settings: {
-    accessToken: string;
-    nome?: string | null;
-  };
+  Settings: undefined;
 
-  PersonalInfo: {
-    accessToken: string;
-    nome?: string | null;
-  };
+  PersonalInfo: undefined;
 
   Permissions: undefined;
 
-  ChangePassword: {
-    accessToken: string;
+  ChangePassword: undefined;
+
+  CameraColorDetection: undefined;
+
+  CapturedClothing: {
+    photoUri: string;
+    colorName?: string | null;
+    colorAddSymbol?: string | null;
   };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function AppNavigator() {
+  const { isRestoringSession, isAuthenticated } = useAuth();
+
+  if (isRestoringSession) {
+    return <SplashScreen />;
+  }
+
   return (
     <NavigationContainer>
       <Stack.Navigator
         screenOptions={{ headerShown: false }}
-        initialRouteName="Intro"
+        initialRouteName={isAuthenticated ? 'Home' : 'Intro'}
       >
         <Stack.Screen name="Intro" component={IntroScreen} />
         <Stack.Screen name="RegisterStart" component={RegisterStartScreen} />
+
         <Stack.Screen
           name="RegisterBasicInfo"
           component={RegisterBasicInfoScreen}
         />
+
         <Stack.Screen
           name="RegisterPassword"
           component={RegisterPasswordScreen}
         />
+
         <Stack.Screen
           name="RegisterVerification"
           component={RegisterVerificationScreen}
         />
+
         <Stack.Screen
           name="RegisterWelcome"
           component={RegisterWelcomeScreen}
         />
+
         <Stack.Screen
           name="RegisterBirthDate"
           component={RegisterBirthDateScreen}
         />
+
         <Stack.Screen name="RegisterGender" component={RegisterGenderScreen} />
+
         <Stack.Screen
           name="RegisterColorBlindness"
           component={RegisterColorBlindnessScreen}
         />
+
         <Stack.Screen
           name="RegisterDifficulty"
           component={RegisterDifficultyScreen}
         />
+
         <Stack.Screen name="Login" component={LoginScreen} />
+
         <Stack.Screen
           name="ForgotPasswordEmail"
           component={ForgotPasswordEmailScreen}
         />
+
         <Stack.Screen
           name="ForgotPasswordVerification"
           component={ForgotPasswordVerificationScreen}
         />
+
         <Stack.Screen
           name="ForgotPasswordNewPassword"
           component={ForgotPasswordNewPasswordScreen}
         />
+
         <Stack.Screen name="Home" component={HomeScreen} />
+
+        <Stack.Screen
+          name="CameraColorDetection"
+          component={CameraColorDetectionScreen}
+        />
+
+        <Stack.Screen
+          name="CapturedClothing"
+          component={CapturedClothingScreen}
+        />
 
         <Stack.Screen
           name="Chat"
@@ -189,7 +221,6 @@ export function AppNavigator() {
         />
 
         <Stack.Screen name="Settings" component={SettingsScreen} />
-
         <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
         <Stack.Screen name="Permissions" component={PermissionsScreen} />
         <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />

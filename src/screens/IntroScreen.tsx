@@ -19,8 +19,13 @@ export function IntroScreen({ navigation }: Props) {
       <Text style={styles.logo}>ZYRA</Text>
 
       <View style={styles.actions}>
-        <Text style={styles.subtitle}>Monte looks com confiança, todos os dias</Text>
-        <ZyraButton title="Começar agora" onPress={() => navigation.navigate('RegisterStart')} />
+        <Text style={styles.subtitle}>
+          Monte looks com confiança, todos os dias
+        </Text>
+        <ZyraButton
+          title="Começar agora"
+          onPress={() => navigation.navigate('RegisterStart')}
+        />
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Entrar"

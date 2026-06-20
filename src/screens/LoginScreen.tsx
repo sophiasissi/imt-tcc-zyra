@@ -12,6 +12,7 @@ import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { apiRequest } from '../services/api';
 import { theme } from '../styles/theme';
+import { useAuth } from '../contexts/AuthContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -37,6 +38,8 @@ type UserProfileResponse = {
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export function LoginScreen({ navigation }: Props) {
+  const { signIn } = useAuth();
+
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [showSenha, setShowSenha] = useState(false);
@@ -96,20 +99,14 @@ export function LoginScreen({ navigation }: Props) {
         },
       );
 
+      await signIn(loginResponse, profileResponse);
+
       console.log('[Login] Perfil localizado com sucesso.');
       console.log('[Login] Direcionando usuário para a Home...');
 
       navigation.reset({
         index: 0,
-        routes: [
-          {
-            name: 'Home',
-            params: {
-              accessToken: loginResponse.accessToken,
-              nome: profileResponse.nome,
-            },
-          },
-        ],
+        routes: [{ name: 'Home' }],
       });
     } catch (error) {
       const rawMessage =
@@ -117,7 +114,10 @@ export function LoginScreen({ navigation }: Props) {
           ? error.message
           : 'Não foi possível entrar na sua conta.';
 
-      console.error('[Login] Erro ao autenticar ou localizar perfil:', rawMessage);
+      console.error(
+        '[Login] Erro ao autenticar ou localizar perfil:',
+        rawMessage,
+      );
 
       const message = rawMessage.includes('conectar ao servidor')
         ? rawMessage

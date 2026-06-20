@@ -15,6 +15,8 @@ import Svg, { Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
 
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { theme } from '../styles/theme';
+import { useAuth } from '../contexts/AuthContext';
+
 import CameraSvg from '../../assets/icons/camera.svg';
 import LogoColorADD from '../../assets/icons/logo_ColorADD.svg';
 import ClothesHome from '../../assets/images/clothes_home.svg';
@@ -69,8 +71,10 @@ function ClothingCard({ type }: ClothingCardProps) {
   );
 }
 
-export function HomeScreen({ route, navigation }: Props) {
-  const { accessToken, nome } = route.params;
+export function HomeScreen({ navigation }: Props) {
+  const { user } = useAuth();
+  const nome = user?.nome ?? null;
+
   const { height: screenHeight } = useWindowDimensions();
 
   const expandedPanelHeight = screenHeight - EXPANDED_PANEL_TOP;
@@ -176,10 +180,7 @@ export function HomeScreen({ route, navigation }: Props) {
   function handleProfile() {
     console.log('[Home] Usuário acessou perfil/configurações.');
 
-    navigation.navigate('Settings', {
-      accessToken,
-      nome,
-    });
+    navigation.navigate('Settings');
   }
 
   function handleSelectCloset() {
@@ -192,6 +193,8 @@ export function HomeScreen({ route, navigation }: Props) {
 
   function handleCamera() {
     console.log('[Home] Usuário acessou a câmera.');
+
+    navigation.navigate('CameraColorDetection');
   }
 
   return (
@@ -222,6 +225,7 @@ export function HomeScreen({ route, navigation }: Props) {
                 </Defs>
                 <Circle cx="28" cy="28" r="28" fill="url(#g)" />
               </Svg>
+
               <View style={styles.colorAddWrapper}>
                 <LogoColorADD width={42} height={42} />
               </View>
@@ -330,7 +334,10 @@ export function HomeScreen({ route, navigation }: Props) {
             accessibilityLabel="Abrir câmera"
             activeOpacity={0.8}
             style={styles.cameraButton}
-            onPress={handleCamera}
+            onPress={(event) => {
+              event.stopPropagation();
+              handleCamera();
+            }}
           >
             <CameraSvg width={24} height={24} />
           </TouchableOpacity>

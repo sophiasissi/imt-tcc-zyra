@@ -20,6 +20,7 @@ import { theme } from '../styles/theme';
 import { apiRequest } from '../services/api';
 import { ZyraButton } from '../components/ZyraButton';
 import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
+import { useAuth } from '../contexts/AuthContext';
 
 import BackIcon from '../../assets/icons/backArrow.svg';
 import ArrowRightIcon from '../../assets/icons/right-arrow-svgrepo-com.svg';
@@ -150,8 +151,10 @@ function getDaltonismoLabel(value?: TipoDaltonismoValue | null) {
   );
 }
 
-export function PersonalInfoScreen({ navigation, route }: Props) {
-  const { accessToken, nome } = route.params;
+export function PersonalInfoScreen({ navigation }: Props) {
+  const { tokens, user, updateUser } = useAuth();
+
+  const accessToken = tokens?.accessToken ?? '';
 
   const [profile, setProfile] = useState<UserProfileResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -160,12 +163,24 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
   const [draftValue, setDraftValue] = useState('');
   const [popup, setPopup] = useState<ZyraPopupConfig | null>(null);
 
-  const displayName = profile?.nome ?? nome ?? 'Nome do Usuário';
+  const displayName = profile?.nome ?? user?.nome ?? 'Nome do Usuário';
 
   useEffect(() => {
     async function loadProfile() {
       try {
         setIsLoading(true);
+
+        if (!accessToken) {
+          setPopup({
+            variant: 'warning',
+            title: 'Sessão não encontrada',
+            message: 'Entre novamente para visualizar suas informações.',
+            buttonText: 'Entendi',
+          });
+
+          setIsLoading(false);
+          return;
+        }
 
         const response = await apiRequest<UserProfileResponse>('/users/me', {
           method: 'GET',
@@ -173,6 +188,7 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
         });
 
         setProfile(response);
+        updateUser(response);
       } catch (error) {
         const message =
           error instanceof Error
@@ -191,7 +207,7 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
     }
 
     void loadProfile();
-  }, [accessToken]);
+  }, [accessToken, updateUser]);
 
   function closePopup() {
     setPopup(null);
@@ -221,7 +237,9 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
   }
 
   async function updateProfile(
-    payload: Partial<Pick<UserProfileResponse, 'dataNascimento' | 'genero' | 'tipoDaltonismo'>>,
+    payload: Partial<
+      Pick<UserProfileResponse, 'dataNascimento' | 'genero' | 'tipoDaltonismo'>
+    >,
   ) {
     const response = await apiRequest<UserProfileResponse>('/users/me', {
       method: 'PATCH',
@@ -230,6 +248,7 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
     });
 
     setProfile(response);
+    updateUser(response);
   }
 
   async function handleSave() {
@@ -395,7 +414,9 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
                     style={styles.editorInput}
                   />
 
-                  <Text style={styles.editorHint}>Use o formato DD/MM/AAAA.</Text>
+                  <Text style={styles.editorHint}>
+                    Use o formato DD/MM/AAAA.
+                  </Text>
                 </>
               ) : null}
 
@@ -409,7 +430,8 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
                       activeOpacity={0.8}
                       style={[
                         styles.optionItem,
-                        draftValue === option.value && styles.optionItemSelected,
+                        draftValue === option.value &&
+                          styles.optionItemSelected,
                       ]}
                       onPress={() => setDraftValue(option.value)}
                     >
@@ -437,7 +459,8 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
                       activeOpacity={0.8}
                       style={[
                         styles.optionItem,
-                        draftValue === option.value && styles.optionItemSelected,
+                        draftValue === option.value &&
+                          styles.optionItemSelected,
                       ]}
                       onPress={() => setDraftValue(option.value)}
                     >

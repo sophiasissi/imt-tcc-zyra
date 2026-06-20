@@ -11,7 +11,10 @@ type Props = NativeStackScreenProps<RootStackParamList, 'RegisterStart'>;
 
 export function RegisterStartScreen({ navigation }: Props) {
   return (
-    <AuthLayout onBack={() => navigation.goBack()} contentStyle={styles.content}>
+    <AuthLayout
+      onBack={() => navigation.goBack()}
+      contentStyle={styles.content}
+    >
       <LoginLogo style={styles.hero} />
       <Text style={styles.welcome}>Bem vindo(a) ao</Text>
       <Text style={styles.brand}>ZYRA</Text>
@@ -25,7 +28,9 @@ export function RegisterStartScreen({ navigation }: Props) {
         accessibilityRole="button"
         activeOpacity={0.84}
         style={styles.secondaryButton}
-        onPress={() => navigation.navigate('RegisterWelcome', { firstName: 'username' })}
+        onPress={() =>
+          navigation.navigate('RegisterWelcome', { firstName: 'username' })
+        }
       >
         <GoogleIcon width={20} height={20} />
         <Text style={styles.secondaryText}>Começar com Google</Text>

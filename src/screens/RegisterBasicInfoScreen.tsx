@@ -59,7 +59,9 @@ export function RegisterBasicInfoScreen({ navigation }: Props) {
         autoCapitalize="words"
         autoCorrect={false}
         returnKeyType="next"
-        error={nameTouched && !nameIsValid ? 'O nome é obrigatório.' : undefined}
+        error={
+          nameTouched && !nameIsValid ? 'O nome é obrigatório.' : undefined
+        }
       />
 
       <ZyraInput

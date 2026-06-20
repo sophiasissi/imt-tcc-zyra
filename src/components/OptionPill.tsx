@@ -1,4 +1,10 @@
-import { StyleProp, StyleSheet, Text, TouchableOpacity, ViewStyle } from 'react-native';
+import {
+  StyleProp,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  ViewStyle,
+} from 'react-native';
 
 import { theme } from '../styles/theme';
 
@@ -18,7 +24,9 @@ export function OptionPill({ label, selected = false, onPress, style }: Props) {
       onPress={onPress}
       style={[styles.pill, style, selected && styles.selected]}
     >
-      <Text style={[styles.text, selected && styles.selectedText]}>{label}</Text>
+      <Text style={[styles.text, selected && styles.selectedText]}>
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }
