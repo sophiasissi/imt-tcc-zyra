@@ -24,6 +24,7 @@ import { ChangePasswordScreen } from '../screens/ChangePasswordScreen';
 import { SplashScreen } from '../screens/SplashScreen';
 import { useAuth } from '../contexts/AuthContext';
 import { CameraColorDetectionScreen } from '../screens/CameraColorDetectionScreen';
+import { CapturedClothingScreen } from '../screens/CapturedClothingScreen';
 
 export type GeneroCadastro =
   | 'MASCULINO'
@@ -116,6 +117,12 @@ export type RootStackParamList = {
   ChangePassword: undefined;
 
   CameraColorDetection: undefined;
+
+  CapturedClothing: {
+    photoUri: string;
+    colorName?: string | null;
+    colorAddSymbol?: string | null;
+  };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -196,7 +203,12 @@ export function AppNavigator() {
           name="CameraColorDetection"
           component={CameraColorDetectionScreen}
         />
-        
+
+        <Stack.Screen
+          name="CapturedClothing"
+          component={CapturedClothingScreen}
+        />
+
         <Stack.Screen
           name="Chat"
           component={ChatScreen}

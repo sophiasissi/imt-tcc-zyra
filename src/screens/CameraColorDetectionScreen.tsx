@@ -3,20 +3,24 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  ImageSourcePropType,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-
 import { RootStackParamList } from '../navigation/AppNavigator';
 import {
   detectColorFromImage,
   DetectColorResponse,
+  validateClothingFromImage,
+  ValidateClothingResponse,
 } from '../services/visionApi';
 import { getColorAddSymbol } from '../utils/colorAddSymbols';
 import { theme } from '../styles/theme';
+import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
 
 import GalleryIcon from '../../assets/icons/photo-svgrepo-com.svg';
 import SwitchCameraIcon from '../../assets/icons/switch-horizontal-svgrepo-com (1).svg';
@@ -24,10 +28,7 @@ import CloseIcon from '../../assets/icons/close-svgrepo-com.svg';
 import FlashIcon from '../../assets/icons/flash-svgrepo-com.svg';
 import FlashOffIcon from '../../assets/icons/flash-off-svgrepo-com.svg';
 
-type Props = NativeStackScreenProps<
-  RootStackParamList,
-  'CameraColorDetection'
->;
+type Props = NativeStackScreenProps<RootStackParamList, 'CameraColorDetection'>;
 
 type CameraFacing = 'back' | 'front';
 
@@ -37,11 +38,16 @@ type CameraWarningProps = {
 
 type MappedColorResult = {
   label: string;
-  image: ReturnType<typeof getColorAddSymbol>['image'];
+  image: ImageSourcePropType;
   raw: DetectColorResponse;
 };
 
 const DETECTION_INTERVAL_MS = 800;
+const FIRST_DETECTION_DELAY_MS = 900;
+
+function sleep(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
 
 function getFriendlyWarningMessage(result?: DetectColorResponse | null) {
   if (!result?.warningCode && !result?.warningMessage) {
@@ -81,6 +87,28 @@ function getFriendlyWarningMessage(result?: DetectColorResponse | null) {
   return 'A leitura pode não estar precisa. Ajuste a iluminação e a posição da peça.';
 }
 
+function getInvalidClothingMessage(validation: ValidateClothingResponse) {
+  const reason = validation.reason?.toUpperCase();
+
+  if (reason === 'PERSON_DETECTED') {
+    return 'Tente fotografar apenas a peça de roupa, sem rosto ou corpo inteiro.';
+  }
+
+  if (reason === 'NOT_CLOTHING') {
+    return 'Não identificamos uma peça de roupa. Tente fotografar a peça novamente.';
+  }
+
+  return 'Não conseguimos confirmar que isso é uma peça de roupa. Tente fotografar novamente.';
+}
+
+function isCameraWarmupError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return error.message.toLowerCase().includes('image could not be captured');
+}
+
 function CameraWarning({ message }: CameraWarningProps) {
   return (
     <View style={styles.warningBox}>
@@ -92,6 +120,8 @@ function CameraWarning({ message }: CameraWarningProps) {
 export function CameraColorDetectionScreen({ navigation }: Props) {
   const cameraRef = useRef<CameraView | null>(null);
   const isDetectingRef = useRef(false);
+  const isCapturingPhotoRef = useRef(false);
+  const isValidatingClothingRef = useRef(false);
   const isScreenActiveRef = useRef(true);
 
   const [permission, requestPermission] = useCameraPermissions();
@@ -99,21 +129,27 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
   const [result, setResult] = useState<DetectColorResponse | null>(null);
   const [lastMappedResult, setLastMappedResult] =
     useState<MappedColorResult | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isFirstDetection, setIsFirstDetection] = useState(true);
   const [facing, setFacing] = useState<CameraFacing>('back');
   const [isFlashOn, setIsFlashOn] = useState(false);
+  const [isValidatingClothing, setIsValidatingClothing] = useState(false);
+  const [frozenPhotoUri, setFrozenPhotoUri] = useState<string | null>(null);
+  const [popup, setPopup] = useState<ZyraPopupConfig | null>(null);
 
   const warningMessage = getFriendlyWarningMessage(result);
 
   const detectCurrentColor = useCallback(async () => {
-    if (!cameraRef.current || !isCameraReady || isDetectingRef.current) {
+    if (
+      !cameraRef.current ||
+      !isCameraReady ||
+      isDetectingRef.current ||
+      isCapturingPhotoRef.current ||
+      isValidatingClothingRef.current
+    ) {
       return;
     }
 
     try {
       isDetectingRef.current = true;
-      setErrorMessage(null);
 
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.2,
@@ -147,20 +183,17 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
           response.colorAddSymbol,
         );
       }
-
-      setIsFirstDetection(false);
     } catch (error) {
+      if (isCameraWarmupError(error)) {
+        return;
+      }
+
       const message =
         error instanceof Error
           ? error.message
           : 'Não foi possível identificar a cor.';
 
       console.error('[Câmera] Erro ao detectar cor:', message);
-
-      if (isScreenActiveRef.current) {
-        setErrorMessage(message);
-        setIsFirstDetection(false);
-      }
     } finally {
       isDetectingRef.current = false;
     }
@@ -173,20 +206,53 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
       isScreenActiveRef.current = false;
     };
   }, []);
+  useFocusEffect(
+    useCallback(() => {
+      setFrozenPhotoUri(null);
+      setIsValidatingClothing(false);
+
+      isCapturingPhotoRef.current = false;
+      isValidatingClothingRef.current = false;
+
+      return undefined;
+    }, []),
+  );
 
   useEffect(() => {
     if (!permission?.granted || !isCameraReady) {
       return;
     }
 
-    void detectCurrentColor();
+    let intervalId: ReturnType<typeof setInterval> | null = null;
 
-    const intervalId = setInterval(() => {
+    const firstDetectionTimeoutId = setTimeout(() => {
       void detectCurrentColor();
-    }, DETECTION_INTERVAL_MS);
 
-    return () => clearInterval(intervalId);
+      intervalId = setInterval(() => {
+        void detectCurrentColor();
+      }, DETECTION_INTERVAL_MS);
+    }, FIRST_DETECTION_DELAY_MS);
+
+    return () => {
+      clearTimeout(firstDetectionTimeoutId);
+
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, [permission?.granted, isCameraReady, detectCurrentColor]);
+
+  async function waitForCurrentColorDetection() {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      if (!isDetectingRef.current) {
+        return true;
+      }
+
+      await sleep(120);
+    }
+
+    return !isDetectingRef.current;
+  }
 
   async function handleRequestPermission() {
     await requestPermission();
@@ -197,20 +263,173 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
   }
 
   function handleSwitchCamera() {
-    setFacing((currentFacing) =>
-      currentFacing === 'back' ? 'front' : 'back',
-    );
+    setFacing((currentFacing) => (currentFacing === 'back' ? 'front' : 'back'));
+    setResult(null);
+    setLastMappedResult(null);
+    setFrozenPhotoUri(null);
+    setPopup(null);
   }
 
   function handleToggleFlash() {
     setIsFlashOn((currentValue) => !currentValue);
   }
 
+  function handleConfirmPopup() {
+    const onConfirm = popup?.onConfirm;
+
+    setPopup(null);
+
+    if (onConfirm) {
+      onConfirm();
+    }
+  }
+
+  async function handleCaptureAndValidateClothing() {
+    if (
+      !cameraRef.current ||
+      !isCameraReady ||
+      isValidatingClothingRef.current
+    ) {
+      return;
+    }
+
+    const cameraAvailable = await waitForCurrentColorDetection();
+
+    if (!cameraAvailable || !cameraRef.current) {
+      setPopup({
+        variant: 'info',
+        title: 'Câmera preparando',
+        message:
+          'A câmera ainda está ajustando a imagem. Tente novamente em alguns segundos.',
+        buttonText: 'Entendi',
+      });
+
+      return;
+    }
+
+    let capturedPhotoUri: string | null = null;
+
+    try {
+      isValidatingClothingRef.current = true;
+      isCapturingPhotoRef.current = true;
+      setIsValidatingClothing(true);
+
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.65,
+        base64: false,
+        skipProcessing: true,
+      });
+
+      capturedPhotoUri = photo?.uri ?? null;
+
+      if (capturedPhotoUri && isScreenActiveRef.current) {
+        setFrozenPhotoUri(capturedPhotoUri);
+      }
+    } catch (error) {
+      if (isCameraWarmupError(error)) {
+        setPopup({
+          variant: 'info',
+          title: 'Câmera preparando',
+          message: 'A câmera ainda está preparando a imagem. Tente novamente.',
+          buttonText: 'Entendi',
+        });
+
+        return;
+      }
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível capturar a foto.';
+
+      console.error('[Câmera] Erro ao capturar foto:', message);
+
+      setPopup({
+        variant: 'error',
+        title: 'Não foi possível capturar',
+        message: 'Não conseguimos tirar a foto agora. Tente novamente.',
+        buttonText: 'Entendi',
+      });
+
+      return;
+    } finally {
+      isCapturingPhotoRef.current = false;
+    }
+
+    if (!capturedPhotoUri || !isScreenActiveRef.current) {
+      isValidatingClothingRef.current = false;
+      setIsValidatingClothing(false);
+      setFrozenPhotoUri(null);
+      return;
+    }
+
+    try {
+      const validation = await validateClothingFromImage(capturedPhotoUri);
+
+      if (!isScreenActiveRef.current) {
+        return;
+      }
+
+      if (!validation.isClothing) {
+        setFrozenPhotoUri(null);
+
+        setPopup({
+          variant: 'error',
+          title: 'Não é uma peça de roupa',
+          message: getInvalidClothingMessage(validation),
+          buttonText: 'Tentar novamente',
+        });
+
+        return;
+      }
+
+      const currentColorName =
+        lastMappedResult?.label ?? result?.colorName ?? null;
+
+      const currentColorAddSymbol =
+        lastMappedResult?.raw.colorAddSymbol ?? result?.colorAddSymbol ?? null;
+
+      setFrozenPhotoUri(null);
+      
+      navigation.navigate('CapturedClothing', {
+        photoUri: capturedPhotoUri,
+        colorName: currentColorName,
+        colorAddSymbol: currentColorAddSymbol,
+      });
+
+      console.log('[Câmera] Peça validada com sucesso:', validation);
+    } catch (error) {
+      setFrozenPhotoUri(null);
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível validar a peça de roupa.';
+
+      console.error('[Câmera] Erro ao validar peça:', message);
+
+      if (isScreenActiveRef.current) {
+        setPopup({
+          variant: 'error',
+          title: 'Não foi possível validar',
+          message:
+            'Não foi possível validar a peça agora. Verifique a API Vision e tente novamente.',
+          buttonText: 'Entendi',
+        });
+      }
+    } finally {
+      isValidatingClothingRef.current = false;
+
+      if (isScreenActiveRef.current) {
+        setIsValidatingClothing(false);
+      }
+    }
+  }
+
   if (!permission) {
     return (
       <View style={styles.permissionScreen}>
         <ActivityIndicator color={theme.colors.primary} size="large" />
-        <Text style={styles.permissionText}>Preparando câmera...</Text>
       </View>
     );
   }
@@ -254,6 +473,10 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
         onCameraReady={() => setIsCameraReady(true)}
       />
 
+      {frozenPhotoUri ? (
+        <Image source={{ uri: frozenPhotoUri }} style={styles.frozenPreview} />
+      ) : null}
+
       <View pointerEvents="none" style={styles.darkTopOverlay} />
       <View pointerEvents="none" style={styles.darkBottomOverlay} />
 
@@ -278,9 +501,7 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
 
               <Text style={styles.resultText}>{lastMappedResult.label}</Text>
             </>
-          ) : (
-            <Text style={styles.waitingText}>apontando...</Text>
-          )}
+          ) : null}
         </View>
 
         <TouchableOpacity
@@ -309,15 +530,12 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
         </View>
       ) : null}
 
-      <View style={styles.statusArea} pointerEvents="none">
-        {isFirstDetection ? (
-          <Text style={styles.statusText}>Aponte para a roupa</Text>
-        ) : null}
-
-        {errorMessage ? (
-          <Text style={styles.errorText}>Verifique a conexão com a API Vision</Text>
-        ) : null}
-      </View>
+      {isValidatingClothing && frozenPhotoUri ? (
+        <View style={styles.freezeLoadingOverlay}>
+          <ActivityIndicator color="#FFFFFF" size="large" />
+          <Text style={styles.freezeLoadingText}>Validando peça...</Text>
+        </View>
+      ) : null}
 
       <View style={styles.bottomBar}>
         <TouchableOpacity
@@ -327,17 +545,25 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
           style={styles.bottomIconButton}
           onPress={() => console.log('[Câmera] Galeria ainda não integrada.')}
         >
-          <GalleryIcon width={52} height={52} color="#FFFFFF" />
+          <GalleryIcon width={34} height={34} color="#FFFFFF" />
         </TouchableOpacity>
 
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Capturar foto"
           activeOpacity={0.85}
-          style={styles.captureOuter}
-          onPress={() => void detectCurrentColor()}
+          style={[
+            styles.captureOuter,
+            isValidatingClothing && styles.captureOuterLoading,
+          ]}
+          disabled={isValidatingClothing}
+          onPress={handleCaptureAndValidateClothing}
         >
-          <View style={styles.captureInner} />
+          {isValidatingClothing ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <View style={styles.captureInner} />
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -347,9 +573,20 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
           style={styles.bottomIconButton}
           onPress={handleSwitchCamera}
         >
-          <SwitchCameraIcon width={52} height={52} color="#FFFFFF" />
+          <SwitchCameraIcon width={36} height={36} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
+
+      <ZyraPopup
+        visible={Boolean(popup)}
+        variant={popup?.variant ?? 'info'}
+        title={popup?.title ?? ''}
+        message={popup?.message}
+        buttonText={popup?.buttonText ?? 'Entendi'}
+        showCloseButton={false}
+        customIcon={popup?.customIcon}
+        onConfirm={handleConfirmPopup}
+      />
     </View>
   );
 }
@@ -361,6 +598,10 @@ const styles = StyleSheet.create({
   },
   camera: {
     ...StyleSheet.absoluteFillObject,
+  },
+  frozenPreview: {
+    ...StyleSheet.absoluteFillObject,
+    resizeMode: 'cover',
   },
   darkTopOverlay: {
     position: 'absolute',
@@ -418,13 +659,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     textTransform: 'lowercase',
   },
-  waitingText: {
-    color: '#000000',
-    fontFamily: theme.fonts.bold,
-    fontSize: 13,
-    textAlign: 'center',
-    textTransform: 'lowercase',
-  },
   crosshair: {
     position: 'absolute',
     top: '50%',
@@ -472,23 +706,21 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     textAlign: 'center',
   },
-  statusArea: {
+  freezeLoadingOverlay: {
     position: 'absolute',
-    left: 24,
-    right: 24,
-    bottom: 166,
+    left: 0,
+    right: 0,
+    top: 148,
+    bottom: 154,
+    backgroundColor: 'rgba(0,0,0,0.28)',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  statusText: {
+  freezeLoadingText: {
     color: '#FFFFFF',
-    fontFamily: theme.fonts.medium,
-    fontSize: 13,
-    textAlign: 'center',
-  },
-  errorText: {
-    color: '#FFFFFF',
-    fontFamily: theme.fonts.medium,
-    fontSize: 12,
+    fontFamily: theme.fonts.bold,
+    fontSize: 14,
+    marginTop: 10,
     textAlign: 'center',
   },
   bottomBar: {
@@ -515,6 +747,9 @@ const styles = StyleSheet.create({
     borderColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  captureOuterLoading: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
   },
   captureInner: {
     width: 56,

@@ -12,21 +12,29 @@ export type DetectColorResponse = {
   warningMessage?: string | null;
 };
 
-export async function detectColorFromImage(
+export type ValidateClothingResponse = {
+  isClothing: boolean;
+  confidence: number;
+  reason?: 'PERSON_DETECTED' | 'NOT_CLOTHING' | string | null;
+};
+
+async function postImageFile<TResponse>(
+  endpoint: string,
   imageUri: string,
-): Promise<DetectColorResponse> {
+  fileName: string,
+): Promise<TResponse> {
   const formData = new FormData();
 
   formData.append('file', {
     uri: imageUri,
-    name: 'camera-frame.jpg',
+    name: fileName,
     type: 'image/jpeg',
   } as unknown as Blob);
 
   let response: Response;
 
   try {
-    response = await fetch(`${VISION_API_URL}/detect-color`, {
+    response = await fetch(`${VISION_API_URL}${endpoint}`, {
       method: 'POST',
       body: formData,
       headers: {
@@ -45,9 +53,29 @@ export async function detectColorFromImage(
     throw new Error(
       data?.detail ??
         data?.message ??
-        'Não foi possível identificar a cor da imagem.',
+        'Não foi possível processar a imagem.',
     );
   }
 
-  return data as DetectColorResponse;
+  return data as TResponse;
+}
+
+export async function detectColorFromImage(
+  imageUri: string,
+): Promise<DetectColorResponse> {
+  return postImageFile<DetectColorResponse>(
+    '/detect-color',
+    imageUri,
+    'camera-frame.jpg',
+  );
+}
+
+export async function validateClothingFromImage(
+  imageUri: string,
+): Promise<ValidateClothingResponse> {
+  return postImageFile<ValidateClothingResponse>(
+    '/validate-clothing',
+    imageUri,
+    'clothing-validation.jpg',
+  );
 }
