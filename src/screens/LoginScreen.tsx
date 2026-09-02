@@ -119,14 +119,23 @@ export function LoginScreen({ navigation }: Props) {
         rawMessage,
       );
 
-      const message = rawMessage.includes('conectar ao servidor')
-        ? rawMessage
-        : 'Confira seu email e senha e tente novamente.';
+      // O back-end já traduz as exceções do Cognito para português — conta não
+      // confirmada, muitas tentativas, email não encontrado. Antes tudo isso
+      // virava "confira email e senha", que em vários casos é falso e manda o
+      // usuário procurar um problema que não existe.
+      //
+      // Só substituímos quando a mensagem é genérica demais para ajudar.
+      const mensagemGenerica =
+        !rawMessage ||
+        rawMessage.includes('Não foi possível concluir a requisição') ||
+        rawMessage.includes('Não foi possível concluir a solicitação');
 
       setPopup({
         variant: 'error',
         title: 'Não foi possível entrar',
-        message,
+        message: mensagemGenerica
+          ? 'Confira seu email e senha e tente novamente.'
+          : rawMessage,
         buttonText: 'Entendi',
       });
     } finally {
