@@ -24,7 +24,13 @@ export type StoredAuthTokens = {
   expiresAt?: number;
 };
 
-function isValidToken(value?: string | null) {
+/**
+ * O `value is string` no retorno e' um type predicate: ele avisa ao
+ * TypeScript que, quando esta funcao devolve true, o argumento pode ser
+ * tratado como string. Sem isso o compilador ve so' um boolean opaco e
+ * continua achando que o valor pode ser null depois da checagem.
+ */
+function isValidToken(value?: string | null): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 

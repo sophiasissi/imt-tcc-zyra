@@ -220,7 +220,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
           setUser(profile);
           return;
         } catch (error) {
-          const recusouToken = error instanceof ApiError && error.isUnauthorized;
+          const recusouToken =
+            error instanceof ApiError && error.isUnauthorized;
 
           // Qualquer falha que não seja recusa do token (rede, 404, 500) não
           // justifica destruir a sessão: renovar não resolveria, e o usuário

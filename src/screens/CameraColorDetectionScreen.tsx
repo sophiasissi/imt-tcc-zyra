@@ -393,7 +393,7 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
         lastMappedResult?.raw.colorAddSymbol ?? result?.colorAddSymbol ?? null;
 
       setFrozenPhotoUri(null);
-      
+
       navigation.navigate('CapturedClothing', {
         photoUri: capturedPhotoUri,
         colorName: currentColorName,

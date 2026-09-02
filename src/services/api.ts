@@ -19,11 +19,7 @@ export class ApiError extends Error {
   readonly status: number | null;
   readonly isNetworkError: boolean;
 
-  constructor(
-    message: string,
-    status: number | null,
-    isNetworkError = false,
-  ) {
+  constructor(message: string, status: number | null, isNetworkError = false) {
     super(message);
 
     // Garante que `instanceof ApiError` funcione mesmo se o Babel transpilar
