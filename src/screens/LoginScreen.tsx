@@ -10,7 +10,7 @@ import { ZyraButton } from '../components/ZyraButton';
 import { ZyraInput } from '../components/ZyraInput';
 import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { apiRequest } from '../services/api';
+import { ApiError, apiRequest } from '../services/api';
 import { theme } from '../styles/theme';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -36,6 +36,43 @@ type UserProfileResponse = {
 };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/**
+ * Busca o perfil e, se ele não existir, recria.
+ *
+ * O cadastro encadeia confirm-signup, login e register-profile. Se a última
+ * falhar — basta uma oscilação de rede — a conta fica confirmada no Cognito
+ * sem registro no Postgres, e a partir daí todo login batia em 404 sem
+ * nenhuma saída pelo app.
+ *
+ * O register-profile é idempotente e aceita perfil sem nome, então dá para
+ * fechar essa lacuna sozinho. O nome é preenchido depois em "Meus dados".
+ */
+async function carregarOuRecriarPerfil(accessToken: string, email: string) {
+  try {
+    return await apiRequest<UserProfileResponse>('/users/me', {
+      method: 'GET',
+      token: accessToken,
+    });
+  } catch (error) {
+    if (!(error instanceof ApiError) || !error.isNotFound) {
+      throw error;
+    }
+
+    console.log('[Login] Perfil não encontrado. Recriando cadastro no ZYRA...');
+
+    await apiRequest<UserProfileResponse>('/auth/register-profile', {
+      method: 'POST',
+      token: accessToken,
+      body: JSON.stringify({ email }),
+    });
+
+    return apiRequest<UserProfileResponse>('/users/me', {
+      method: 'GET',
+      token: accessToken,
+    });
+  }
+}
 
 export function LoginScreen({ navigation }: Props) {
   const { signIn } = useAuth();
@@ -91,12 +128,9 @@ export function LoginScreen({ navigation }: Props) {
 
       console.log('[Login] Autenticação concluída com sucesso.');
 
-      const profileResponse = await apiRequest<UserProfileResponse>(
-        '/users/me',
-        {
-          method: 'GET',
-          token: loginResponse.accessToken,
-        },
+      const profileResponse = await carregarOuRecriarPerfil(
+        loginResponse.accessToken,
+        normalizedEmail,
       );
 
       await signIn(loginResponse, profileResponse);
