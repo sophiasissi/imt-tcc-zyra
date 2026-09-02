@@ -8,6 +8,44 @@ type RequestOptions = RequestInit & {
   token?: string;
 };
 
+/**
+ * Erro de API que preserva o status HTTP.
+ *
+ * Sem ele não dá para diferenciar "o servidor recusou" de "o celular está sem
+ * rede", e o app acaba tratando os dois do mesmo jeito — foi o que fazia a
+ * sessão ser apagada ao abrir o app offline.
+ */
+export class ApiError extends Error {
+  readonly status: number | null;
+  readonly isNetworkError: boolean;
+
+  constructor(
+    message: string,
+    status: number | null,
+    isNetworkError = false,
+  ) {
+    super(message);
+
+    // Garante que `instanceof ApiError` funcione mesmo se o Babel transpilar
+    // a classe para função, o que quebraria a cadeia de protótipos.
+    Object.setPrototypeOf(this, ApiError.prototype);
+
+    this.name = 'ApiError';
+    this.status = status;
+    this.isNetworkError = isNetworkError;
+  }
+
+  /** Token ausente, inválido ou expirado. */
+  get isUnauthorized() {
+    return this.status === 401 || this.status === 403;
+  }
+
+  /** O recurso não existe — no /users/me significa perfil não criado. */
+  get isNotFound() {
+    return this.status === 404;
+  }
+}
+
 function normalizeApiMessage(message: unknown) {
   if (!message) {
     return 'Não foi possível concluir a solicitação. Tente novamente.';
@@ -79,7 +117,8 @@ export async function apiRequest<T>(
         ? normalizeApiMessage(error.message)
         : 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.';
 
-    throw new Error(message);
+    // Não houve resposta: o pedido não chegou ao servidor.
+    throw new ApiError(message, null, true);
   }
 
   const data = await response.json().catch(() => null);
@@ -89,7 +128,7 @@ export async function apiRequest<T>(
       data?.message ?? 'Não foi possível concluir a requisição.',
     );
 
-    throw new Error(message);
+    throw new ApiError(message, response.status);
   }
 
   return data as T;
