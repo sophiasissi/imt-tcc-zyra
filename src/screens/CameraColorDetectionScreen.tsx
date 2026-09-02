@@ -50,15 +50,11 @@ function sleep(milliseconds: number) {
 }
 
 function getFriendlyWarningMessage(result?: DetectColorResponse | null) {
-  if (!result?.warningCode && !result?.warningMessage) {
+  if (!result?.warningCode) {
     return null;
   }
 
-  if (result.warningMessage) {
-    return result.warningMessage;
-  }
-
-  const warningCode = result.warningCode?.toUpperCase();
+  const warningCode = result.warningCode.toUpperCase();
 
   if (
     warningCode?.includes('LOW_LIGHT') ||
@@ -151,10 +147,15 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
     try {
       isDetectingRef.current = true;
 
+      // skipProcessing NÃO pode ser usado aqui: ele entrega a imagem crua do
+      // sensor, sem ajuste de orientação e sem escalar para o preview. O
+      // sensor é landscape e o preview é portrait ocupando a tela toda, então
+      // a foto passava a conter muito mais cena do que o usuário via — e o
+      // recorte central acabava misturando parede, fundo e sombra, cuja média
+      // é sempre cinza. A flag também descarta o `quality`.
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.2,
+        quality: 0.3,
         base64: false,
-        skipProcessing: true,
       });
 
       if (!photo?.uri || !isScreenActiveRef.current) {
@@ -314,10 +315,12 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
       isCapturingPhotoRef.current = true;
       setIsValidatingClothing(true);
 
+      // Sem skipProcessing pelo mesmo motivo do loop de detecção — e aqui a
+      // orientação importa ainda mais, porque esta foto é exibida na tela de
+      // roupa capturada, onde o Image não respeita o EXIF.
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.65,
         base64: false,
-        skipProcessing: true,
       });
 
       capturedPhotoUri = photo?.uri ?? null;

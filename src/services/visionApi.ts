@@ -8,8 +8,11 @@ export type DetectColorResponse = {
   colorName: string;
   hex: string;
   colorAddSymbol: string;
+  /** Cor dominante lida, útil para depurar leituras estranhas. */
+  rgb?: [number, number, number];
+  /** Fração de pixels próximos da cor dominante, de 0 a 1. */
+  confidence?: number;
   warningCode?: string | null;
-  warningMessage?: string | null;
 };
 
 export type ValidateClothingResponse = {
