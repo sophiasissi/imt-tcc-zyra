@@ -94,9 +94,32 @@ function normalizeApiMessage(message: unknown) {
   return rawMessage;
 }
 
+/**
+ * Devolve um access token novo, ou null se a sessão acabou de vez.
+ *
+ * Registrado pelo AuthContext, que é quem tem o refresh token. Fica aqui,
+ * como gancho, para que QUALQUER chamada autenticada ganhe a renovação
+ * automática — inclusive as telas que ainda vão existir.
+ */
+type TokenRefresher = () => Promise<string | null>;
+
+let refreshAuthToken: TokenRefresher | null = null;
+
+export function setTokenRefresher(refresher: TokenRefresher | null) {
+  refreshAuthToken = refresher;
+}
+
 export async function apiRequest<T>(
   endpoint: string,
   options: RequestOptions = {},
+): Promise<T> {
+  return runRequest<T>(endpoint, options, false);
+}
+
+async function runRequest<T>(
+  endpoint: string,
+  options: RequestOptions,
+  jaRenovou: boolean,
 ): Promise<T> {
   const { token, headers, ...requestOptions } = options;
 
@@ -124,6 +147,21 @@ export async function apiRequest<T>(
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
+    // Token venceu durante o uso: renova uma vez e repete a chamada. Sem isso
+    // o app fica inutilizável até ser fechado e reaberto, porque a renovação
+    // só acontecia na abertura.
+    const renovador = refreshAuthToken;
+    const podeRenovar =
+      response.status === 401 && Boolean(token) && !jaRenovou && renovador;
+
+    if (podeRenovar && renovador) {
+      const novoToken = await renovador();
+
+      if (novoToken && novoToken !== token) {
+        return runRequest<T>(endpoint, { ...options, token: novoToken }, true);
+      }
+    }
+
     const message = normalizeApiMessage(
       data?.message ?? 'Não foi possível concluir a requisição.',
     );

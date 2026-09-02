@@ -5,10 +5,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
-import { ApiError, apiRequest } from '../services/api';
+import { ApiError, apiRequest, setTokenRefresher } from '../services/api';
 import {
   clearAuthTokens,
   getAuthTokens,
@@ -48,6 +49,12 @@ type AuthContextData = {
   updateUser: (user: Partial<UserProfile>) => void;
 };
 
+/**
+ * Margem antes do vencimento. Um token que vence em menos de um minuto e
+ * tratado como vencido, para nao sair uma requisicao que ja nasce falhando.
+ */
+const TOKEN_SKEW_MS = 60_000;
+
 const AuthContext = createContext<AuthContextData | null>(null);
 
 export function AuthProvider({ children }: PropsWithChildren) {
@@ -86,6 +93,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
         refreshToken: response.refreshToken ?? currentTokens.refreshToken,
         expiresIn: response.expiresIn,
         tokenType: response.tokenType,
+        expiresAt: response.expiresIn
+          ? Date.now() + response.expiresIn * 1000
+          : undefined,
       };
 
       await saveAuthTokens(nextTokens);
@@ -107,6 +117,55 @@ export function AuthProvider({ children }: PropsWithChildren) {
     },
     [performRefresh],
   );
+
+  /**
+   * Renovação usada pelo apiRequest quando uma chamada leva 401 no meio do uso.
+   *
+   * Guarda a renovação em andamento numa ref: se várias telas tomarem 401 ao
+   * mesmo tempo, todas esperam a mesma chamada em vez de disparar uma cada.
+   */
+  const refreshInFlight = useRef<Promise<string | null> | null>(null);
+
+  const renovarTokenParaRequisicoes = useCallback(async () => {
+    if (refreshInFlight.current) {
+      return refreshInFlight.current;
+    }
+
+    const renovacao = (async (): Promise<string | null> => {
+      try {
+        const stored = await getAuthTokens();
+
+        if (!stored?.refreshToken) {
+          return null;
+        }
+
+        // Outra requisição pode ter renovado enquanto esta esperava: nesse
+        // caso o token guardado já é novo e não há por que ir à rede.
+        if (stored.expiresAt && stored.expiresAt - Date.now() > TOKEN_SKEW_MS) {
+          return stored.accessToken;
+        }
+
+        const proximos = await performRefresh(stored);
+
+        return proximos.accessToken;
+      } catch (error) {
+        console.error('[Sessão] Falha ao renovar o token em uso:', error);
+        return null;
+      } finally {
+        refreshInFlight.current = null;
+      }
+    })();
+
+    refreshInFlight.current = renovacao;
+
+    return renovacao;
+  }, [performRefresh]);
+
+  useEffect(() => {
+    setTokenRefresher(renovarTokenParaRequisicoes);
+
+    return () => setTokenRefresher(null);
+  }, [renovarTokenParaRequisicoes]);
 
   const fetchProfile = useCallback(async (accessToken: string) => {
     const profile = await apiRequest<UserProfile>('/users/me', {
