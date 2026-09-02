@@ -1,4 +1,4 @@
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import GoogleIcon from '../../assets/icons/googleColor.svg';
 import LoginLogo from '../../assets/images/login_logo.svg';

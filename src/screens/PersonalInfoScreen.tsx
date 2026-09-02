@@ -64,7 +64,7 @@ type InfoRowProps = {
   onPress?: () => void;
 };
 
-const generoOptions: Array<{ label: string; value: GeneroValue }> = [
+const generoOptions: { label: string; value: GeneroValue }[] = [
   { label: 'Masculino', value: 'MASCULINO' },
   { label: 'Feminino', value: 'FEMININO' },
   { label: 'Não binário', value: 'NAO_BINARIO' },
@@ -72,10 +72,10 @@ const generoOptions: Array<{ label: string; value: GeneroValue }> = [
   { label: 'Prefiro não dizer', value: 'PREFIRO_NAO_DIZER' },
 ];
 
-const daltonismoOptions: Array<{
+const daltonismoOptions: {
   label: string;
   value: TipoDaltonismoValue;
-}> = [
+}[] = [
   { label: 'Protanomalia', value: 'PROTANOMALIA' },
   { label: 'Protanopia', value: 'PROTANOPIA' },
   { label: 'Deuteranomalia', value: 'DEUTERANOMALIA' },

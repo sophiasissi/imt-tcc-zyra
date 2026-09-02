@@ -5,14 +5,17 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
-import { apiRequest } from '../services/api';
+import { ApiError, apiRequest, setTokenRefresher } from '../services/api';
 import {
   clearAuthTokens,
   getAuthTokens,
+  getCachedProfile,
   saveAuthTokens,
+  saveCachedProfile,
   StoredAuthTokens,
 } from '../services/authStorage';
 
@@ -46,6 +49,12 @@ type AuthContextData = {
   updateUser: (user: Partial<UserProfile>) => void;
 };
 
+/**
+ * Margem antes do vencimento. Um token que vence em menos de um minuto e
+ * tratado como vencido, para nao sair uma requisicao que ja nasce falhando.
+ */
+const TOKEN_SKEW_MS = 60_000;
+
 const AuthContext = createContext<AuthContextData | null>(null);
 
 export function AuthProvider({ children }: PropsWithChildren) {
@@ -61,43 +70,143 @@ export function AuthProvider({ children }: PropsWithChildren) {
     await clearAuthTokens();
   }, []);
 
+  /**
+   * Renova os tokens. Propaga o erro para quem chamou decidir o que fazer:
+   * uma recusa do Cognito significa sessão encerrada, mas uma falha de rede
+   * significa apenas "tente de novo depois".
+   */
+  const performRefresh = useCallback(
+    async (currentTokens: StoredAuthTokens) => {
+      const response = await apiRequest<RefreshTokenResponse>(
+        '/auth/refresh-token',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            refreshToken: currentTokens.refreshToken,
+          }),
+        },
+      );
+
+      const nextTokens: StoredAuthTokens = {
+        accessToken: response.accessToken,
+        idToken: response.idToken,
+        refreshToken: response.refreshToken ?? currentTokens.refreshToken,
+        expiresIn: response.expiresIn,
+        tokenType: response.tokenType,
+        expiresAt: response.expiresIn
+          ? Date.now() + response.expiresIn * 1000
+          : undefined,
+      };
+
+      await saveAuthTokens(nextTokens);
+      setTokens(nextTokens);
+
+      return nextTokens;
+    },
+    [],
+  );
+
   const refreshStoredSession = useCallback(
     async (currentTokens: StoredAuthTokens) => {
       try {
-        const response = await apiRequest<RefreshTokenResponse>(
-          '/auth/refresh-token',
-          {
-            method: 'POST',
-            body: JSON.stringify({
-              refreshToken: currentTokens.refreshToken,
-            }),
-          },
-        );
-
-        const nextTokens: StoredAuthTokens = {
-          accessToken: response.accessToken,
-          idToken: response.idToken,
-          refreshToken: response.refreshToken ?? currentTokens.refreshToken,
-          expiresIn: response.expiresIn,
-          tokenType: response.tokenType,
-        };
-
-        await saveAuthTokens(nextTokens);
-        setTokens(nextTokens);
-
-        return nextTokens;
+        return await performRefresh(currentTokens);
       } catch (error) {
         console.error('[Sessão] Não foi possível renovar a sessão:', error);
         return null;
       }
+    },
+    [performRefresh],
+  );
+
+  /**
+   * Renovação usada pelo apiRequest quando uma chamada leva 401 no meio do uso.
+   *
+   * Guarda a renovação em andamento numa ref: se várias telas tomarem 401 ao
+   * mesmo tempo, todas esperam a mesma chamada em vez de disparar uma cada.
+   */
+  const refreshInFlight = useRef<Promise<string | null> | null>(null);
+
+  const renovarTokenParaRequisicoes = useCallback(async () => {
+    if (refreshInFlight.current) {
+      return refreshInFlight.current;
+    }
+
+    const renovacao = (async (): Promise<string | null> => {
+      try {
+        const stored = await getAuthTokens();
+
+        if (!stored?.refreshToken) {
+          return null;
+        }
+
+        // Outra requisição pode ter renovado enquanto esta esperava: nesse
+        // caso o token guardado já é novo e não há por que ir à rede.
+        if (stored.expiresAt && stored.expiresAt - Date.now() > TOKEN_SKEW_MS) {
+          return stored.accessToken;
+        }
+
+        const proximos = await performRefresh(stored);
+
+        return proximos.accessToken;
+      } catch (error) {
+        console.error('[Sessão] Falha ao renovar o token em uso:', error);
+        return null;
+      } finally {
+        refreshInFlight.current = null;
+      }
+    })();
+
+    refreshInFlight.current = renovacao;
+
+    return renovacao;
+  }, [performRefresh]);
+
+  useEffect(() => {
+    setTokenRefresher(renovarTokenParaRequisicoes);
+
+    return () => setTokenRefresher(null);
+  }, [renovarTokenParaRequisicoes]);
+
+  const fetchProfile = useCallback(async (accessToken: string) => {
+    const profile = await apiRequest<UserProfile>('/users/me', {
+      method: 'GET',
+      token: accessToken,
+    });
+
+    await saveCachedProfile(profile);
+
+    return profile;
+  }, []);
+
+  /**
+   * Mantém a sessão no ar usando o último perfil guardado.
+   *
+   * Usado quando a falha foi de rede: o token continua válido, o servidor é
+   * que está inalcançável. Apagar a sessão aqui deslogaria a pessoa por ter
+   * aberto o app no metrô — e ela não conseguiria entrar de novo, justamente
+   * por estar sem internet.
+   */
+  const keepSessionOffline = useCallback(
+    async (currentTokens: StoredAuthTokens) => {
+      const cachedProfile = await getCachedProfile<UserProfile>();
+
+      setTokens(currentTokens);
+
+      if (cachedProfile) {
+        setUser(cachedProfile);
+      }
+
+      return Boolean(cachedProfile);
     },
     [],
   );
 
   useEffect(() => {
     async function restoreSession() {
+      let storedTokens: StoredAuthTokens | null = null;
+
       try {
-        const storedTokens = await getAuthTokens();
+        storedTokens = await getAuthTokens();
 
         if (!storedTokens?.accessToken) {
           await clearSessionState();
@@ -105,44 +214,60 @@ export function AuthProvider({ children }: PropsWithChildren) {
         }
 
         try {
-          const profile = await apiRequest<UserProfile>('/users/me', {
-            method: 'GET',
-            token: storedTokens.accessToken,
-          });
+          const profile = await fetchProfile(storedTokens.accessToken);
 
           setTokens(storedTokens);
           setUser(profile);
           return;
-        } catch {
-          const refreshedTokens = await refreshStoredSession(storedTokens);
+        } catch (error) {
+          const recusouToken =
+            error instanceof ApiError && error.isUnauthorized;
 
-          if (!refreshedTokens) {
-            await clearSessionState();
+          // Qualquer falha que não seja recusa do token (rede, 404, 500) não
+          // justifica destruir a sessão: renovar não resolveria, e o usuário
+          // seria deslogado por um problema que não é dele.
+          if (!recusouToken) {
+            console.log(
+              '[Sessão] Perfil indisponível agora. Sessão preservada:',
+              error instanceof Error ? error.message : error,
+            );
+
+            await keepSessionOffline(storedTokens);
             return;
           }
 
-          const profile = await apiRequest<UserProfile>('/users/me', {
-            method: 'GET',
-            token: refreshedTokens.accessToken,
-          });
+          const refreshedTokens = await performRefresh(storedTokens);
+          const profile = await fetchProfile(refreshedTokens.accessToken);
 
           setTokens(refreshedTokens);
           setUser(profile);
         }
       } catch (error) {
-        console.error('[Sessão] Erro ao restaurar sessão:', error);
-        await clearSessionState();
+        // Falha durante a renovação ou na segunda busca do perfil.
+        const recusouToken = error instanceof ApiError && error.isUnauthorized;
+
+        if (!recusouToken && storedTokens?.accessToken) {
+          console.log(
+            '[Sessão] Não foi possível renovar agora. Sessão preservada.',
+          );
+
+          await keepSessionOffline(storedTokens);
+        } else {
+          console.error('[Sessão] Sessão encerrada:', error);
+          await clearSessionState();
+        }
       } finally {
         setIsRestoringSession(false);
       }
     }
 
     void restoreSession();
-  }, [clearSessionState, refreshStoredSession]);
+  }, [clearSessionState, performRefresh, fetchProfile, keepSessionOffline]);
 
   const signIn = useCallback(
     async (nextTokens: StoredAuthTokens, nextUser: UserProfile) => {
       await saveAuthTokens(nextTokens);
+      await saveCachedProfile(nextUser);
       setTokens(nextTokens);
       setUser(nextUser);
     },
@@ -188,10 +313,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
         return currentUser;
       }
 
-      return {
+      const nextUser = {
         ...currentUser,
         ...nextUserData,
       };
+
+      // Mantém o cache alinhado para a próxima abertura offline.
+      void saveCachedProfile(nextUser);
+
+      return nextUser;
     });
   }, []);
 

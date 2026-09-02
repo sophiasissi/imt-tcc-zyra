@@ -1,15 +1,20 @@
 const VISION_API_URL = process.env.EXPO_PUBLIC_VISION_API_URL;
 
 if (!VISION_API_URL) {
-  throw new Error('EXPO_PUBLIC_VISION_API_URL não foi definida no arquivo .env');
+  throw new Error(
+    'EXPO_PUBLIC_VISION_API_URL não foi definida no arquivo .env',
+  );
 }
 
 export type DetectColorResponse = {
   colorName: string;
   hex: string;
   colorAddSymbol: string;
+  /** Cor dominante lida, útil para depurar leituras estranhas. */
+  rgb?: [number, number, number];
+  /** Fração de pixels próximos da cor dominante, de 0 a 1. */
+  confidence?: number;
   warningCode?: string | null;
-  warningMessage?: string | null;
 };
 
 export type ValidateClothingResponse = {
@@ -51,9 +56,7 @@ async function postImageFile<TResponse>(
 
   if (!response.ok) {
     throw new Error(
-      data?.detail ??
-        data?.message ??
-        'Não foi possível processar a imagem.',
+      data?.detail ?? data?.message ?? 'Não foi possível processar a imagem.',
     );
   }
 
