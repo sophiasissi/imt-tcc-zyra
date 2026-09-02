@@ -32,6 +32,10 @@ const laranja = require('../../assets/coloradd/preto/laranja.png');
 const prateado = require('../../assets/coloradd/preto/prateado.png');
 const preto = require('../../assets/coloradd/preto/preto.png');
 
+const rosaClaro = require('../../assets/coloradd/preto/rosa claro.png');
+const rosaEscuro = require('../../assets/coloradd/preto/rosa escuro.png');
+const rosa = require('../../assets/coloradd/preto/rosa.png');
+
 const roxoClaro = require('../../assets/coloradd/preto/roxo claro.png');
 const roxoEscuro = require('../../assets/coloradd/preto/roxo escuro.png');
 const roxo = require('../../assets/coloradd/preto/roxo.png');
@@ -128,6 +132,19 @@ const symbolMap: Record<string, ColorAddSymbolData> = {
   PRETO: {
     label: 'preto',
     image: preto,
+  },
+
+  ROSA_CLARO: {
+    label: 'rosa claro',
+    image: rosaClaro,
+  },
+  ROSA_ESCURO: {
+    label: 'rosa escuro',
+    image: rosaEscuro,
+  },
+  ROSA: {
+    label: 'rosa',
+    image: rosa,
   },
 
   ROXO_CLARO: {
