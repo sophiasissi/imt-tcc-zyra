@@ -5,6 +5,7 @@ const ID_TOKEN_KEY = 'zyra.auth.idToken';
 const REFRESH_TOKEN_KEY = 'zyra.auth.refreshToken';
 const EXPIRES_IN_KEY = 'zyra.auth.expiresIn';
 const TOKEN_TYPE_KEY = 'zyra.auth.tokenType';
+const PROFILE_KEY = 'zyra.auth.profile';
 
 export type StoredAuthTokens = {
   accessToken: string;
@@ -59,5 +60,36 @@ export async function clearAuthTokens() {
     SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
     SecureStore.deleteItemAsync(EXPIRES_IN_KEY),
     SecureStore.deleteItemAsync(TOKEN_TYPE_KEY),
+    SecureStore.deleteItemAsync(PROFILE_KEY),
   ]);
+}
+
+/**
+ * Guarda o último perfil conhecido.
+ *
+ * Sem esse cache, abrir o app sem internet deixa o usuário sem perfil e o
+ * `isAuthenticated` vira falso — ou seja, mesmo preservando os tokens ele
+ * cairia na tela de introdução como se estivesse deslogado.
+ */
+export async function saveCachedProfile(profile: unknown) {
+  try {
+    await SecureStore.setItemAsync(PROFILE_KEY, JSON.stringify(profile));
+  } catch (error) {
+    // Cache é melhor-esforço: se falhar, o app segue buscando na API.
+    console.warn('[Sessão] Não foi possível guardar o perfil em cache:', error);
+  }
+}
+
+export async function getCachedProfile<T>(): Promise<T | null> {
+  try {
+    const raw = await SecureStore.getItemAsync(PROFILE_KEY);
+
+    if (!raw) {
+      return null;
+    }
+
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
 }
