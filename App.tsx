@@ -8,7 +8,10 @@ import { AuthProvider } from './src/contexts/AuthContext';
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
 
-  const [fontsLoaded] = useFonts({
+  // O segundo elemento é o erro de carregamento. Ignorá-lo fazia o app ficar
+  // preso no `return null` para sempre se qualquer uma das sete fontes
+  // falhasse: tela em branco, sem mensagem, sem log e sem forma de sair.
+  const [fontsLoaded, fontError] = useFonts({
     PoppinsRegular: require('./assets/fonts/Poppins/Poppins-Regular.ttf'),
     PoppinsMedium: require('./assets/fonts/Poppins/Poppins-Medium.ttf'),
     PoppinsSemiBold: require('./assets/fonts/Poppins/Poppins-SemiBold.ttf'),
@@ -18,17 +21,31 @@ export default function App() {
     Jomhuria: require('./assets/fonts/Jomhuria/Jomhuria-Regular.ttf'),
   });
 
+  // Com erro, seguimos com a fonte do sistema. Um app de acessibilidade não
+  // pode ter a tipografia como ponto único de falha: melhor a fonte errada
+  // do que tela nenhuma.
+  const podeSeguir = fontsLoaded || Boolean(fontError);
+
   useEffect(() => {
-    if (!fontsLoaded) return;
+    if (fontError) {
+      console.error(
+        '[Fontes] Falha ao carregar as fontes. Seguindo com a fonte do sistema:',
+        fontError,
+      );
+    }
+  }, [fontError]);
+
+  useEffect(() => {
+    if (!podeSeguir) return;
 
     const timer = setTimeout(() => {
       setIsLoading(false);
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [fontsLoaded]);
+  }, [podeSeguir]);
 
-  if (!fontsLoaded) {
+  if (!podeSeguir) {
     return null;
   }
 

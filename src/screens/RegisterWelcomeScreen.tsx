@@ -10,7 +10,7 @@ import { theme } from '../styles/theme';
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterWelcome'>;
 
 export function RegisterWelcomeScreen({ navigation, route }: Props) {
-  const firstName = route.params.firstName.trim() || 'usuário';
+  const firstName = route.params.firstName?.trim() || 'usuário';
 
   function handleContinue() {
     console.log('[Onboarding] Saindo das boas-vindas.');

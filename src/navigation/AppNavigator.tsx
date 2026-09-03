@@ -54,14 +54,17 @@ export type RootStackParamList = {
   };
 
   RegisterVerification: {
-    firstName: string;
-    name: string;
+    // Opcionais porque esta tela também é alcançada pelo login, quando a conta
+    // existe mas nunca foi confirmada. Nesse caminho só temos email e senha —
+    // o nome ainda não foi coletado.
+    firstName?: string;
+    name?: string;
     email: string;
     password: string;
   };
 
   RegisterWelcome: {
-    firstName: string;
+    firstName?: string;
     accessToken?: string;
   };
 
