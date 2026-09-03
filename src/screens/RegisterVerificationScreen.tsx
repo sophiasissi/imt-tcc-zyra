@@ -12,9 +12,9 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { AuthLayout } from '../components/AuthLayout';
 import { ZyraButton } from '../components/ZyraButton';
 import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
-import { apiRequest } from '../services/api';
+import { ApiError, apiRequest } from '../services/api';
 import { theme } from '../styles/theme';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, UserProfile } from '../contexts/AuthContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterVerification'>;
 
@@ -28,13 +28,6 @@ type LoginResponse = {
   refreshToken: string;
   expiresIn: number;
   tokenType: string;
-};
-
-type RegisterProfileResponse = {
-  id: string;
-  cognitoSub: string;
-  nome: string | null;
-  email: string | null;
 };
 
 function isInvalidCodeMessage(message: string) {
@@ -56,6 +49,44 @@ function isEmailAlreadyRegistered(message: string) {
   );
 }
 
+/**
+ * Busca o perfil e, no caso raro em que ele não existe, cria.
+ *
+ * O caminho normal é só a busca: o perfil passou a ser gravado no
+ * `/auth/signup`, junto com a criação da conta. A criação aqui cobre a falha
+ * de banco naquele momento — e só é possível quando ainda temos o nome, ou
+ * seja, quando o cadastro está sendo feito de ponta a ponta agora.
+ */
+async function carregarOuCriarPerfil(
+  accessToken: string,
+  email: string,
+  nome?: string,
+) {
+  try {
+    return await apiRequest<UserProfile>('/users/me', {
+      method: 'GET',
+      token: accessToken,
+    });
+  } catch (error) {
+    if (!(error instanceof ApiError) || !error.isNotFound || !nome) {
+      throw error;
+    }
+
+    console.log('[Perfil] Perfil ausente no login. Criando agora...');
+
+    await apiRequest<UserProfile>('/auth/register-profile', {
+      method: 'POST',
+      token: accessToken,
+      body: JSON.stringify({ nome, email }),
+    });
+
+    return apiRequest<UserProfile>('/users/me', {
+      method: 'GET',
+      token: accessToken,
+    });
+  }
+}
+
 export function RegisterVerificationScreen({ navigation, route }: Props) {
   const { signIn } = useAuth();
 
@@ -63,6 +94,7 @@ export function RegisterVerificationScreen({ navigation, route }: Props) {
 
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const [popup, setPopup] = useState<ZyraPopupConfig | null>(null);
 
   const inputRef = useRef<TextInput>(null);
@@ -72,6 +104,45 @@ export function RegisterVerificationScreen({ navigation, route }: Props) {
 
   function closePopup() {
     setPopup(null);
+  }
+
+  async function handleResendCode() {
+    if (isResending || isLoading) {
+      return;
+    }
+
+    try {
+      setIsResending(true);
+
+      const response = await apiRequest<{ message: string }>(
+        '/auth/resend-code',
+        {
+          method: 'POST',
+          body: JSON.stringify({ email }),
+        },
+      );
+
+      setPopup({
+        variant: 'success',
+        title: 'Código reenviado',
+        message: response.message,
+        buttonText: 'Entendi',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível reenviar o código.';
+
+      setPopup({
+        variant: 'error',
+        title: 'Não foi possível reenviar',
+        message,
+        buttonText: 'Entendi',
+      });
+    } finally {
+      setIsResending(false);
+    }
   }
 
   async function handleContinue() {
@@ -125,42 +196,22 @@ export function RegisterVerificationScreen({ navigation, route }: Props) {
         Boolean(loginResponse.refreshToken),
       );
 
-      console.log('[Perfil] Iniciando criação do perfil inicial...');
-
-      const profileResponse = await apiRequest<RegisterProfileResponse>(
-        '/auth/register-profile',
-        {
-          method: 'POST',
-          token: loginResponse.accessToken,
-          body: JSON.stringify({
-            nome: name,
-            email,
-          }),
-        },
+      // O perfil já foi gravado no /auth/signup, junto com a criação da conta.
+      // Aqui normalmente só o buscamos — inclusive quando a pessoa chegou por
+      // um cadastro abandonado, em que o nome não está mais em mãos.
+      const profileResponse = await carregarOuCriarPerfil(
+        loginResponse.accessToken,
+        email,
+        name,
       );
 
-      await signIn(loginResponse, {
-        id: profileResponse.id,
-        cognitoSub: profileResponse.cognitoSub,
-        nome: profileResponse.nome,
-        email: profileResponse.email,
-        dataNascimento: null,
-        genero: null,
-        tipoDaltonismo: null,
-        nivelDificuldadeLooks: null,
-      });
+      await signIn(loginResponse, profileResponse);
 
-      console.log('[Perfil] Perfil inicial salvo no PostgreSQL.');
-      console.log('[Perfil] ID interno recebido:', Boolean(profileResponse.id));
-      console.log(
-        '[Perfil] Vínculo Cognito recebido:',
-        Boolean(profileResponse.cognitoSub),
-      );
-
+      console.log('[Perfil] Perfil confirmado no PostgreSQL.');
       console.log('[Onboarding] Iniciando perguntas complementares...');
 
       navigation.navigate('RegisterWelcome', {
-        firstName,
+        firstName: firstName ?? profileResponse.nome?.split(/\s+/)[0],
         accessToken: loginResponse.accessToken,
       });
     } catch (error) {
@@ -262,6 +313,20 @@ export function RegisterVerificationScreen({ navigation, route }: Props) {
             style={styles.hiddenInput}
           />
         </TouchableOpacity>
+
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Reenviar código de confirmação"
+          accessibilityState={{ disabled: isResending || isLoading }}
+          activeOpacity={0.75}
+          disabled={isResending || isLoading}
+          onPress={handleResendCode}
+          style={styles.resendButton}
+        >
+          <Text style={styles.resendText}>
+            {isResending ? 'Reenviando...' : 'Não recebeu? Reenviar código'}
+          </Text>
+        </TouchableOpacity>
       </AuthLayout>
 
       {popup ? (
@@ -322,5 +387,17 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     color: 'transparent',
     opacity: 0.02,
+  },
+  resendButton: {
+    alignSelf: 'center',
+    marginTop: 24,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  resendText: {
+    color: theme.colors.link,
+    fontFamily: theme.fonts.semiBold,
+    fontSize: 14,
+    textAlign: 'center',
   },
 });

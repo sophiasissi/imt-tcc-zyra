@@ -100,9 +100,13 @@ export function RegisterPasswordScreen({ navigation, route }: Props) {
 
       console.log('[Cadastro] Iniciando criação da conta no Cognito...');
 
+      // O nome vai junto para o perfil ser gravado já no cadastro. Antes ele
+      // ficava só nos parâmetros de navegação e se perdia se o app fosse
+      // fechado antes da confirmação do código.
       const signUpResponse = await apiRequest<SignUpResponse>('/auth/signup', {
         method: 'POST',
         body: JSON.stringify({
+          nome: name,
           email,
           password,
         }),
