@@ -112,6 +112,8 @@ export function cadastrarRoupa(input: CadastrarRoupaInput, token: string) {
     method: 'POST',
     body: formData,
     token,
+    // O back espera até 45s pela análise da visão, mais o envio ao S3.
+    timeoutMs: 60_000,
   });
 }
 

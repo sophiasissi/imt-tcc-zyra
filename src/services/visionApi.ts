@@ -1,4 +1,12 @@
+import {
+  fetchWithTimeout,
+  isNetworkErrorMessage,
+} from '../utils/fetchWithTimeout';
 import { photoFormDataPart } from '../utils/photoUpload';
+
+// O /detect-color e o /validate-clothing respondem em menos de um segundo na
+// rede local. Passar muito disso é sinal de servidor inalcançável.
+const VISION_TIMEOUT_MS = 10_000;
 
 const VISION_API_URL = process.env.EXPO_PUBLIC_VISION_API_URL;
 
@@ -39,13 +47,17 @@ async function postImageFile<TResponse>(
   let response: Response;
 
   try {
-    response = await fetch(url, {
-      method: 'POST',
-      body: formData,
-      headers: {
-        Accept: 'application/json',
+    response = await fetchWithTimeout(
+      url,
+      {
+        method: 'POST',
+        body: formData,
+        headers: {
+          Accept: 'application/json',
+        },
       },
-    });
+      VISION_TIMEOUT_MS,
+    );
   } catch (error) {
     // O catch daqui era vazio e sempre culpava a conexão. Qualquer falha —
     // arquivo da foto inexistente, URI inválida, corpo malformado — aparecia
@@ -60,9 +72,7 @@ async function postImageFile<TResponse>(
         `  arquivo: ${imageUri}`,
     );
 
-    // "Network request failed" é o que o React Native devolve tanto quando o
-    // servidor está inalcançável quanto quando não consegue ler o arquivo.
-    const pareceRede = /network request (failed|timed out)/i.test(detalhe);
+    const pareceRede = isNetworkErrorMessage(detalhe);
 
     throw new Error(
       pareceRede
