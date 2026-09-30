@@ -119,13 +119,17 @@ async function runRequest<T>(
 ): Promise<T> {
   const { token, headers, ...requestOptions } = options;
 
+  // Com FormData (envio de foto) o fetch precisa montar o Content-Type
+  // sozinho, porque é ele que gera o boundary do multipart.
+  const enviaArquivo = requestOptions.body instanceof FormData;
+
   let response: Response;
 
   try {
     response = await fetch(`${API_URL}${endpoint}`, {
       ...requestOptions,
       headers: {
-        'Content-Type': 'application/json',
+        ...(enviaArquivo ? {} : { 'Content-Type': 'application/json' }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...headers,
       },
