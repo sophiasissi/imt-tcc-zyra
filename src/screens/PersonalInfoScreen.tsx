@@ -575,7 +575,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   editorBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
   editorSheet: {

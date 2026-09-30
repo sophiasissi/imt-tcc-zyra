@@ -600,10 +600,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
   },
   camera: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   frozenPreview: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     resizeMode: 'cover',
   },
   darkTopOverlay: {

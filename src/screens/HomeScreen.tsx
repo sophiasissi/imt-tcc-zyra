@@ -80,9 +80,12 @@ export function HomeScreen({ navigation }: Props) {
   const expandedPanelHeight = screenHeight - EXPANDED_PANEL_TOP;
   const collapsedTranslateY = expandedPanelHeight - COLLAPSED_PANEL_HEIGHT;
 
-  const panelTranslateY = React.useRef(
-    new Animated.Value(collapsedTranslateY),
-  ).current;
+  // useState com função de inicialização em vez de useRef(...).current: cria
+  // uma vez só, igual antes, mas sem ler uma ref durante a renderização — o
+  // que o React 19 passou a sinalizar (regra react-hooks/refs).
+  const [panelTranslateY] = React.useState(
+    () => new Animated.Value(collapsedTranslateY),
+  );
   const currentPanelPosition = React.useRef(collapsedTranslateY);
   const dragStartPosition = React.useRef(collapsedTranslateY);
   const collapsedPosition = React.useRef(collapsedTranslateY);
@@ -126,7 +129,11 @@ export function HomeScreen({ navigation }: Props) {
     });
   }
 
-  const panelPanResponder = React.useRef(
+  // Criado uma única vez, como antes. Os handlers abaixo leem refs, mas só
+  // rodam durante o gesto do usuário — nunca durante a renderização. A regra
+  // não consegue distinguir os dois casos e acusa falso positivo aqui.
+  // eslint-disable-next-line react-hooks/refs
+  const [panelPanResponder] = React.useState(() =>
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gestureState) =>
@@ -171,7 +178,7 @@ export function HomeScreen({ navigation }: Props) {
         animateClosetPanel(expandedState.current);
       },
     }),
-  ).current;
+  );
 
   function handleColorAdd() {
     console.log('[Home] Usuário acessou área ColorADD.');
@@ -389,7 +396,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   profileGradient: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   colorAddOuter: {
     width: 56,
