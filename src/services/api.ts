@@ -1,11 +1,21 @@
+import {
+  fetchWithTimeout,
+  isNetworkErrorMessage,
+} from '../utils/fetchWithTimeout';
+
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 if (!API_URL) {
   throw new Error('EXPO_PUBLIC_API_URL não foi definida no arquivo .env');
 }
 
+// Prazo padrão das chamadas ao back. O cadastro de peça passa o seu, maior,
+// porque inclui a análise pela OpenAI.
+const DEFAULT_TIMEOUT_MS = 15_000;
+
 type RequestOptions = RequestInit & {
   token?: string;
+  timeoutMs?: number;
 };
 
 /**
@@ -60,11 +70,7 @@ function normalizeApiMessage(message: unknown) {
     return 'Não foi possível concluir a solicitação. Tente novamente em alguns instantes.';
   }
 
-  if (
-    lowerMessage.includes('network request timed out') ||
-    lowerMessage.includes('network request failed') ||
-    lowerMessage.includes('failed to fetch')
-  ) {
+  if (isNetworkErrorMessage(lowerMessage)) {
     return 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.';
   }
 
@@ -117,7 +123,12 @@ async function runRequest<T>(
   options: RequestOptions,
   jaRenovou: boolean,
 ): Promise<T> {
-  const { token, headers, ...requestOptions } = options;
+  const {
+    token,
+    headers,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    ...requestOptions
+  } = options;
 
   // Com FormData (envio de foto) o fetch precisa montar o Content-Type
   // sozinho, porque é ele que gera o boundary do multipart.
@@ -126,14 +137,18 @@ async function runRequest<T>(
   let response: Response;
 
   try {
-    response = await fetch(`${API_URL}${endpoint}`, {
-      ...requestOptions,
-      headers: {
-        ...(enviaArquivo ? {} : { 'Content-Type': 'application/json' }),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...headers,
+    response = await fetchWithTimeout(
+      `${API_URL}${endpoint}`,
+      {
+        ...requestOptions,
+        headers: {
+          ...(enviaArquivo ? {} : { 'Content-Type': 'application/json' }),
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...headers,
+        },
       },
-    });
+      timeoutMs,
+    );
   } catch (error) {
     const message =
       error instanceof Error
