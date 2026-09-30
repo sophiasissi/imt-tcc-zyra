@@ -1,3 +1,5 @@
+import { photoFormDataPart } from '../utils/photoUpload';
+
 const VISION_API_URL = process.env.EXPO_PUBLIC_VISION_API_URL;
 
 if (!VISION_API_URL) {
@@ -30,25 +32,42 @@ async function postImageFile<TResponse>(
 ): Promise<TResponse> {
   const formData = new FormData();
 
-  formData.append('file', {
-    uri: imageUri,
-    name: fileName,
-    type: 'image/jpeg',
-  } as unknown as Blob);
+  formData.append('file', photoFormDataPart(imageUri, fileName));
+
+  const url = `${VISION_API_URL}${endpoint}`;
 
   let response: Response;
 
   try {
-    response = await fetch(`${VISION_API_URL}${endpoint}`, {
+    response = await fetch(url, {
       method: 'POST',
       body: formData,
       headers: {
         Accept: 'application/json',
       },
     });
-  } catch {
+  } catch (error) {
+    // O catch daqui era vazio e sempre culpava a conexão. Qualquer falha —
+    // arquivo da foto inexistente, URI inválida, corpo malformado — aparecia
+    // como "a API está fora do ar", mandando procurar o problema no lugar
+    // errado. Agora o motivo real vai para o log.
+    const detalhe =
+      error instanceof Error ? error.message : String(error ?? 'desconhecido');
+
+    console.error(
+      `[Visão] Falha ao enviar a imagem para ${url}\n` +
+        `  motivo: ${detalhe}\n` +
+        `  arquivo: ${imageUri}`,
+    );
+
+    // "Network request failed" é o que o React Native devolve tanto quando o
+    // servidor está inalcançável quanto quando não consegue ler o arquivo.
+    const pareceRede = /network request (failed|timed out)/i.test(detalhe);
+
     throw new Error(
-      'Não foi possível conectar à API de visão. Verifique se ela está rodando.',
+      pareceRede
+        ? 'Não foi possível falar com a API de visão. Verifique se ela está rodando e se o celular está na mesma rede.'
+        : `Não foi possível enviar a foto para análise. (${detalhe})`,
     );
   }
 

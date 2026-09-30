@@ -21,6 +21,7 @@ import {
 import { getColorAddSymbol } from '../utils/colorAddSymbols';
 import { theme } from '../styles/theme';
 import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
+import { ZyraLoadingPopup } from '../components/ZyraLoadingPopup';
 
 import GalleryIcon from '../../assets/icons/photo-svgrepo-com.svg';
 import SwitchCameraIcon from '../../assets/icons/switch-horizontal-svgrepo-com (1).svg';
@@ -44,6 +45,13 @@ type MappedColorResult = {
 
 const DETECTION_INTERVAL_MS = 800;
 const FIRST_DETECTION_DELAY_MS = 900;
+
+// Só as etapas gratuitas acontecem ao tirar a foto. O reconhecimento do tipo,
+// tecido e estilo fica para o cadastro.
+const CAPTURE_STEPS = [
+  'Conferindo se é uma peça de roupa',
+  'Identificando a cor e o símbolo ColorADD',
+];
 
 function sleep(milliseconds: number) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -367,7 +375,15 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
     }
 
     try {
-      const validation = await validateClothingFromImage(capturedPhotoUri);
+      // Só as etapas gratuitas rodam aqui: a validação (CLIP local) e a cor da
+      // foto (OpenCV). A análise paga fica para quando a pessoa tocar em
+      // "Cadastrar nova peça" — tirar foto não pode gastar com a OpenAI.
+      // A cor não é essencial para seguir: se falhar, usamos a última leitura
+      // do loop da câmera.
+      const [validation, corDaFoto] = await Promise.all([
+        validateClothingFromImage(capturedPhotoUri),
+        detectColorFromImage(capturedPhotoUri).catch(() => null),
+      ]);
 
       if (!isScreenActiveRef.current) {
         return;
@@ -386,21 +402,31 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
         return;
       }
 
-      const currentColorName =
-        lastMappedResult?.label ?? result?.colorName ?? null;
+      // A cor da foto capturada é mais confiável que a última leitura do
+      // loop, que pode ser de um instante anterior com a mira em outro ponto.
+      const colorName =
+        corDaFoto?.colorName ??
+        lastMappedResult?.label ??
+        result?.colorName ??
+        null;
 
-      const currentColorAddSymbol =
-        lastMappedResult?.raw.colorAddSymbol ?? result?.colorAddSymbol ?? null;
+      const colorAddSymbol =
+        corDaFoto?.colorAddSymbol ??
+        lastMappedResult?.raw.colorAddSymbol ??
+        result?.colorAddSymbol ??
+        null;
+
+      const corHex =
+        corDaFoto?.hex ?? lastMappedResult?.raw.hex ?? result?.hex ?? null;
 
       setFrozenPhotoUri(null);
 
       navigation.navigate('CapturedClothing', {
         photoUri: capturedPhotoUri,
-        colorName: currentColorName,
-        colorAddSymbol: currentColorAddSymbol,
+        colorName,
+        colorAddSymbol,
+        corHex,
       });
-
-      console.log('[Câmera] Peça validada com sucesso:', validation);
     } catch (error) {
       setFrozenPhotoUri(null);
 
@@ -533,11 +559,14 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
         </View>
       ) : null}
 
-      {isValidatingClothing && frozenPhotoUri ? (
-        <View style={styles.freezeLoadingOverlay}>
-          <ActivityIndicator color="#FFFFFF" size="large" />
-          <Text style={styles.freezeLoadingText}>Validando peça...</Text>
-        </View>
+      {/* Montado só enquanto valida: assim o popup recomeça da primeira
+          etapa a cada foto, sem precisar zerar o estado por dentro. */}
+      {isValidatingClothing ? (
+        <ZyraLoadingPopup
+          visible
+          title="Conferindo sua foto"
+          steps={CAPTURE_STEPS}
+        />
       ) : null}
 
       <View style={styles.bottomBar}>
@@ -600,10 +629,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
   },
   camera: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   frozenPreview: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     resizeMode: 'cover',
   },
   darkTopOverlay: {
@@ -707,23 +736,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.medium,
     fontSize: 12,
     lineHeight: 17,
-    textAlign: 'center',
-  },
-  freezeLoadingOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 148,
-    bottom: 154,
-    backgroundColor: 'rgba(0,0,0,0.28)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  freezeLoadingText: {
-    color: '#FFFFFF',
-    fontFamily: theme.fonts.bold,
-    fontSize: 14,
-    marginTop: 10,
     textAlign: 'center',
   },
   bottomBar: {

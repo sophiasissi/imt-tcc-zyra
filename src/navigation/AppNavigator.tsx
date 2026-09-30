@@ -125,6 +125,7 @@ export type RootStackParamList = {
     photoUri: string;
     colorName?: string | null;
     colorAddSymbol?: string | null;
+    corHex?: string | null;
   };
 };
 

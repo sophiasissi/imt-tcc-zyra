@@ -1,6 +1,8 @@
 import {
+  ActivityIndicator,
   Animated,
   PanResponder,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -10,12 +12,15 @@ import {
 } from 'react-native';
 import React from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
 
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { theme } from '../styles/theme';
 import { useAuth } from '../contexts/AuthContext';
+import { listarRoupas, Roupa } from '../services/roupasApi';
+import { ClosetItemCard } from '../components/ClosetItemCard';
 
 import CameraSvg from '../../assets/icons/camera.svg';
 import LogoColorADD from '../../assets/icons/logo_ColorADD.svg';
@@ -26,63 +31,62 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 const COLLAPSED_PANEL_HEIGHT = 320;
 const EXPANDED_PANEL_TOP = 115;
 
-type ClothingCardProps = {
-  type: 'shirt' | 'pants' | 'jacket' | 'skirt';
-};
-
-function ClothingCard({ type }: ClothingCardProps) {
-  return (
-    <View style={styles.clothingCard}>
-      {type === 'shirt' ? (
-        <View style={styles.miniShirt}>
-          <View style={styles.miniShirtBody} />
-          <View style={[styles.miniSleeve, styles.miniSleeveLeft]} />
-          <View style={[styles.miniSleeve, styles.miniSleeveRight]} />
-          <View style={styles.shirtStripeOne} />
-          <View style={styles.shirtStripeTwo} />
-          <View style={styles.shirtStripeThree} />
-        </View>
-      ) : null}
-
-      {type === 'pants' ? (
-        <View style={styles.miniPants}>
-          <View style={styles.pantsWaist} />
-          <View style={[styles.pantsLeg, styles.pantsLegLeft]} />
-          <View style={[styles.pantsLeg, styles.pantsLegRight]} />
-        </View>
-      ) : null}
-
-      {type === 'jacket' ? (
-        <View style={styles.miniJacket}>
-          <View style={styles.jacketBody} />
-          <View style={[styles.jacketSleeve, styles.jacketSleeveLeft]} />
-          <View style={[styles.jacketSleeve, styles.jacketSleeveRight]} />
-          <View style={styles.jacketZip} />
-        </View>
-      ) : null}
-
-      {type === 'skirt' ? (
-        <View style={styles.miniSkirt}>
-          <View style={styles.skirtWaist} />
-          <View style={styles.skirtBody} />
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
 export function HomeScreen({ navigation }: Props) {
-  const { user } = useAuth();
+  const { user, tokens } = useAuth();
   const nome = user?.nome ?? null;
+  const accessToken = tokens?.accessToken ?? null;
+
+  const [roupas, setRoupas] = React.useState<Roupa[]>([]);
+  const [isLoadingRoupas, setIsLoadingRoupas] = React.useState(true);
+  const [roupasError, setRoupasError] = React.useState<string | null>(null);
+
+  // Recarrega sempre que a Home volta ao foco: é assim que a peça recém
+  // cadastrada aparece no armário ao voltar do cadastro.
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!accessToken) {
+        return;
+      }
+
+      let ativo = true;
+
+      listarRoupas(accessToken)
+        .then((lista) => {
+          if (ativo) {
+            setRoupas(lista);
+            setRoupasError(null);
+          }
+        })
+        .catch((error: unknown) => {
+          console.error('[Home] Falha ao carregar o armário:', error);
+
+          if (ativo) {
+            setRoupasError('Não foi possível carregar suas peças agora.');
+          }
+        })
+        .finally(() => {
+          if (ativo) {
+            setIsLoadingRoupas(false);
+          }
+        });
+
+      return () => {
+        ativo = false;
+      };
+    }, [accessToken]),
+  );
 
   const { height: screenHeight } = useWindowDimensions();
 
   const expandedPanelHeight = screenHeight - EXPANDED_PANEL_TOP;
   const collapsedTranslateY = expandedPanelHeight - COLLAPSED_PANEL_HEIGHT;
 
-  const panelTranslateY = React.useRef(
-    new Animated.Value(collapsedTranslateY),
-  ).current;
+  // useState com função de inicialização em vez de useRef(...).current: cria
+  // uma vez só, igual antes, mas sem ler uma ref durante a renderização — o
+  // que o React 19 passou a sinalizar (regra react-hooks/refs).
+  const [panelTranslateY] = React.useState(
+    () => new Animated.Value(collapsedTranslateY),
+  );
   const currentPanelPosition = React.useRef(collapsedTranslateY);
   const dragStartPosition = React.useRef(collapsedTranslateY);
   const collapsedPosition = React.useRef(collapsedTranslateY);
@@ -126,7 +130,11 @@ export function HomeScreen({ navigation }: Props) {
     });
   }
 
-  const panelPanResponder = React.useRef(
+  // Criado uma única vez, como antes. Os handlers abaixo leem refs, mas só
+  // rodam durante o gesto do usuário — nunca durante a renderização. A regra
+  // não consegue distinguir os dois casos e acusa falso positivo aqui.
+  // eslint-disable-next-line react-hooks/refs
+  const [panelPanResponder] = React.useState(() =>
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gestureState) =>
@@ -171,7 +179,7 @@ export function HomeScreen({ navigation }: Props) {
         animateClosetPanel(expandedState.current);
       },
     }),
-  ).current;
+  );
 
   function handleColorAdd() {
     console.log('[Home] Usuário acessou área ColorADD.');
@@ -309,12 +317,26 @@ export function HomeScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.clothingGrid}>
-          <ClothingCard type="shirt" />
-          <ClothingCard type="pants" />
-          <ClothingCard type="jacket" />
-          <ClothingCard type="skirt" />
-        </View>
+        {isLoadingRoupas && roupas.length === 0 ? (
+          <ActivityIndicator
+            color={theme.colors.primary}
+            style={styles.closetFeedback}
+          />
+        ) : roupas.length === 0 ? (
+          <Text style={[styles.closetEmptyText, styles.closetFeedback]}>
+            {roupasError ??
+              'Seu armário ainda está vazio. Toque na câmera, fotografe uma peça e cadastre.'}
+          </Text>
+        ) : (
+          <ScrollView
+            contentContainerStyle={styles.clothingGrid}
+            showsVerticalScrollIndicator={false}
+          >
+            {roupas.map((roupa) => (
+              <ClosetItemCard key={roupa.id} roupa={roupa} />
+            ))}
+          </ScrollView>
+        )}
       </Animated.View>
 
       <View style={styles.chatContainer}>
@@ -389,7 +411,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   profileGradient: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   colorAddOuter: {
     width: 56,
@@ -470,158 +492,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 5,
+    paddingBottom: 140,
   },
-  clothingCard: {
-    width: '32%',
-    height: 140,
-    borderRadius: 10,
-    backgroundColor: '#F8F6F4',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
+  closetFeedback: {
+    marginTop: 32,
   },
-  miniShirt: {
-    width: 70,
-    height: 72,
-    position: 'relative',
-  },
-  miniShirtBody: {
-    position: 'absolute',
-    width: 44,
-    height: 58,
-    backgroundColor: '#E9E6DE',
-    left: 13,
-    top: 8,
-  },
-  miniSleeve: {
-    position: 'absolute',
-    width: 19,
-    height: 28,
-    backgroundColor: '#E9E6DE',
-    top: 12,
-  },
-  miniSleeveLeft: {
-    left: 1,
-    transform: [{ rotate: '24deg' }],
-  },
-  miniSleeveRight: {
-    right: 1,
-    transform: [{ rotate: '-24deg' }],
-  },
-  shirtStripeOne: {
-    position: 'absolute',
-    width: 58,
-    height: 3,
-    backgroundColor: '#3D4A53',
-    top: 26,
-    left: 6,
-  },
-  shirtStripeTwo: {
-    position: 'absolute',
-    width: 56,
-    height: 3,
-    backgroundColor: '#3D4A53',
-    top: 36,
-    left: 7,
-  },
-  shirtStripeThree: {
-    position: 'absolute',
-    width: 50,
-    height: 3,
-    backgroundColor: '#3D4A53',
-    top: 46,
-    left: 10,
-  },
-  miniPants: {
-    width: 54,
-    height: 76,
-    position: 'relative',
-  },
-  pantsWaist: {
-    width: 48,
-    height: 17,
-    borderRadius: 3,
-    backgroundColor: '#B29D87',
-    position: 'absolute',
-    left: 3,
-    top: 4,
-  },
-  pantsLeg: {
-    width: 21,
-    height: 60,
-    borderRadius: 3,
-    backgroundColor: '#B29D87',
-    position: 'absolute',
-    top: 15,
-  },
-  pantsLegLeft: {
-    left: 5,
-    transform: [{ rotate: '3deg' }],
-  },
-  pantsLegRight: {
-    right: 5,
-    transform: [{ rotate: '-3deg' }],
-  },
-  miniJacket: {
-    width: 70,
-    height: 72,
-    position: 'relative',
-  },
-  jacketBody: {
-    width: 44,
-    height: 58,
-    borderRadius: 3,
-    backgroundColor: '#32739C',
-    position: 'absolute',
-    left: 13,
-    top: 8,
-  },
-  jacketSleeve: {
-    width: 17,
-    height: 42,
-    borderRadius: 3,
-    backgroundColor: '#32739C',
-    position: 'absolute',
-    top: 12,
-  },
-  jacketSleeveLeft: {
-    left: 4,
-    transform: [{ rotate: '18deg' }],
-  },
-  jacketSleeveRight: {
-    right: 4,
-    transform: [{ rotate: '-18deg' }],
-  },
-  jacketZip: {
-    width: 2,
-    height: 53,
-    backgroundColor: '#ECECEC',
-    position: 'absolute',
-    left: 34,
-    top: 11,
-  },
-  miniSkirt: {
-    width: 58,
-    height: 70,
-    position: 'relative',
-  },
-  skirtWaist: {
-    width: 35,
-    height: 11,
-    borderRadius: 3,
-    backgroundColor: '#D482A0',
-    position: 'absolute',
-    top: 7,
-    left: 12,
-  },
-  skirtBody: {
-    width: 51,
-    height: 51,
-    borderRadius: 5,
-    backgroundColor: '#D482A0',
-    position: 'absolute',
-    top: 16,
-    left: 4,
+  closetEmptyText: {
+    color: theme.colors.muted,
+    fontFamily: theme.fonts.medium,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+    paddingHorizontal: 16,
   },
   chatContainer: {
     position: 'absolute',

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   Image,
@@ -13,19 +14,96 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { getColorAddSymbol } from '../utils/colorAddSymbols';
 import { theme } from '../styles/theme';
+import { useAuth } from '../contexts/AuthContext';
+import { cadastrarRoupa } from '../services/roupasApi';
+import { ZyraButton } from '../components/ZyraButton';
+import { ZyraLoadingPopup } from '../components/ZyraLoadingPopup';
+import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
 
 import LeftArrowIcon from '../../assets/icons/left-arrow-svgrepo-com.svg';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CapturedClothing'>;
 
+// Etapas reais do cadastro, na ordem em que o back executa.
+const CADASTRO_STEPS = [
+  'Guardando a foto no seu armário',
+  'Reconhecendo o tipo, o tecido e o estilo',
+  'Salvando as informações da peça',
+];
+
 export function CapturedClothingScreen({ navigation, route }: Props) {
-  const { photoUri, colorName, colorAddSymbol } = route.params;
+  const { photoUri, colorName, colorAddSymbol, corHex } = route.params;
+  const { tokens } = useAuth();
+
+  const [isCadastrando, setIsCadastrando] = useState(false);
+  const [popup, setPopup] = useState<ZyraPopupConfig | null>(null);
 
   const symbol = getColorAddSymbol(colorAddSymbol);
   const displayedColorName = symbol?.label ?? colorName ?? '';
 
   function handleGoBack() {
     navigation.goBack();
+  }
+
+  /**
+   * Só aqui a análise paga acontece: o back sobe a foto para o S3, analisa a
+   * peça com a OpenAI e grava no banco. Tirar a foto não gasta nada.
+   */
+  async function handleCadastrar() {
+    const accessToken = tokens?.accessToken;
+
+    if (!accessToken || isCadastrando) {
+      return;
+    }
+
+    setIsCadastrando(true);
+
+    try {
+      await cadastrarRoupa(
+        {
+          photoUri,
+          corNome: colorName,
+          corHex,
+          corColorAdd: colorAddSymbol,
+        },
+        accessToken,
+      );
+
+      setPopup({
+        variant: 'success',
+        title: 'Roupa cadastrada!',
+        message: 'A peça já está no seu armário digital.',
+        buttonText: 'Ir para o início',
+        // Volta para a Home tirando a câmera e esta tela da pilha. A Home
+        // recarrega o armário ao ganhar foco, então a peça nova já aparece.
+        onConfirm: () => navigation.popTo('Home'),
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível cadastrar a peça agora.';
+
+      console.error('[Cadastro de peça] Falha:', message);
+
+      // A foto continua nesta tela: a pessoa pode tentar de novo sem
+      // precisar fotografar outra vez.
+      setPopup({
+        variant: 'error',
+        title: 'Não foi possível cadastrar',
+        message,
+        buttonText: 'Entendi',
+      });
+    } finally {
+      setIsCadastrando(false);
+    }
+  }
+
+  function handleConfirmPopup() {
+    const onConfirm = popup?.onConfirm;
+
+    setPopup(null);
+    onConfirm?.();
   }
 
   return (
@@ -74,6 +152,8 @@ export function CapturedClothingScreen({ navigation, route }: Props) {
               Peças do seu armário que combinam
             </Text>
 
+            {/* Aqui entram as duas peças sugeridas pelo algoritmo de
+                combinação (sem IA), quando ele estiver pronto. */}
             <View style={styles.emptyStateBox}>
               <Text style={styles.emptyStateTitle}>
                 Ainda não há combinações disponíveis
@@ -85,18 +165,33 @@ export function CapturedClothingScreen({ navigation, route }: Props) {
               </Text>
             </View>
 
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityState={{ disabled: true }}
-              activeOpacity={1}
-              disabled
-              style={styles.disabledButton}
-            >
-              <Text style={styles.disabledButtonText}>Cadastrar nova peça</Text>
-            </TouchableOpacity>
+            <ZyraButton
+              title="Cadastrar nova peça"
+              onPress={handleCadastrar}
+              disabled={isCadastrando}
+            />
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      {/* Montado só durante o cadastro, para as etapas recomeçarem do início
+          a cada tentativa. */}
+      {isCadastrando ? (
+        <ZyraLoadingPopup
+          visible
+          title="Cadastrando sua peça"
+          steps={CADASTRO_STEPS}
+        />
+      ) : null}
+
+      <ZyraPopup
+        visible={Boolean(popup)}
+        variant={popup?.variant ?? 'info'}
+        title={popup?.title ?? ''}
+        message={popup?.message}
+        buttonText={popup?.buttonText ?? 'Entendi'}
+        onConfirm={handleConfirmPopup}
+      />
     </LinearGradient>
   );
 }
@@ -193,24 +288,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.medium,
     fontSize: 12,
     lineHeight: 18,
-    textAlign: 'center',
-  },
-  disabledButton: {
-    height: 56,
-    borderRadius: 10,
-    backgroundColor: 'rgba(171, 0, 62, 0.42)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: theme.colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  disabledButtonText: {
-    color: 'rgba(255,255,255,0.86)',
-    fontFamily: theme.fonts.bold,
-    fontSize: 18,
     textAlign: 'center',
   },
 });

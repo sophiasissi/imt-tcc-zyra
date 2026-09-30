@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   hiddenInput: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     color: 'transparent',
     opacity: 0.02,
   },
