@@ -19,7 +19,7 @@ import Svg, { Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { theme } from '../styles/theme';
 import { useAuth } from '../contexts/AuthContext';
-import { listarRoupas, Roupa } from '../services/roupasApi';
+import { listarPecas, Peca } from '../services/pecasApi';
 import { ClosetItemCard } from '../components/ClosetItemCard';
 
 import CameraSvg from '../../assets/icons/camera.svg';
@@ -36,9 +36,9 @@ export function HomeScreen({ navigation }: Props) {
   const nome = user?.nome ?? null;
   const accessToken = tokens?.accessToken ?? null;
 
-  const [roupas, setRoupas] = React.useState<Roupa[]>([]);
-  const [isLoadingRoupas, setIsLoadingRoupas] = React.useState(true);
-  const [roupasError, setRoupasError] = React.useState<string | null>(null);
+  const [pecas, setPecas] = React.useState<Peca[]>([]);
+  const [isLoadingPecas, setIsLoadingPecas] = React.useState(true);
+  const [pecasError, setPecasError] = React.useState<string | null>(null);
 
   // Recarrega sempre que a Home volta ao foco: é assim que a peça recém
   // cadastrada aparece no armário ao voltar do cadastro.
@@ -50,23 +50,23 @@ export function HomeScreen({ navigation }: Props) {
 
       let ativo = true;
 
-      listarRoupas(accessToken)
+      listarPecas(accessToken)
         .then((lista) => {
           if (ativo) {
-            setRoupas(lista);
-            setRoupasError(null);
+            setPecas(lista);
+            setPecasError(null);
           }
         })
         .catch((error: unknown) => {
           console.error('[Home] Falha ao carregar o armário:', error);
 
           if (ativo) {
-            setRoupasError('Não foi possível carregar suas peças agora.');
+            setPecasError('Não foi possível carregar suas peças agora.');
           }
         })
         .finally(() => {
           if (ativo) {
-            setIsLoadingRoupas(false);
+            setIsLoadingPecas(false);
           }
         });
 
@@ -317,14 +317,14 @@ export function HomeScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
 
-        {isLoadingRoupas && roupas.length === 0 ? (
+        {isLoadingPecas && pecas.length === 0 ? (
           <ActivityIndicator
             color={theme.colors.primary}
             style={styles.closetFeedback}
           />
-        ) : roupas.length === 0 ? (
+        ) : pecas.length === 0 ? (
           <Text style={[styles.closetEmptyText, styles.closetFeedback]}>
-            {roupasError ??
+            {pecasError ??
               'Seu armário ainda está vazio. Toque na câmera, fotografe uma peça e cadastre.'}
           </Text>
         ) : (
@@ -332,8 +332,8 @@ export function HomeScreen({ navigation }: Props) {
             contentContainerStyle={styles.clothingGrid}
             showsVerticalScrollIndicator={false}
           >
-            {roupas.map((roupa) => (
-              <ClosetItemCard key={roupa.id} roupa={roupa} />
+            {pecas.map((peca) => (
+              <ClosetItemCard key={peca.id} peca={peca} />
             ))}
           </ScrollView>
         )}

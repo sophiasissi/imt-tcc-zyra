@@ -416,7 +416,7 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
         result?.colorAddSymbol ??
         null;
 
-      const corHex =
+      const hex =
         corDaFoto?.hex ?? lastMappedResult?.raw.hex ?? result?.hex ?? null;
 
       setFrozenPhotoUri(null);
@@ -425,7 +425,7 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
         photoUri: capturedPhotoUri,
         colorName,
         colorAddSymbol,
-        corHex,
+        hex,
       });
     } catch (error) {
       setFrozenPhotoUri(null);
