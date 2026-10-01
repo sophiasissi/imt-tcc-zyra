@@ -50,46 +50,52 @@ export const CATEGORIA_LABEL: Record<Categoria, string> = {
   BOLSA: 'bolsa',
 };
 
-/** Peça do closet como o back devolve. */
-export type Roupa = {
+/** Peça do closet como o back devolve (model `Peca` do Prisma). */
+export type Peca = {
   id: string;
   usuarioId: string;
-  nome: string | null;
   /** URL assinada, válida por cerca de uma hora. */
   imagemUrl: string;
-  corNome: string | null;
-  corHex: string | null;
-  corColorAdd: string | null;
-  categoria: Categoria | null;
+  categoria: Categoria;
   estilo: Estilo | null;
   estampa: Estampa | null;
+  ocasioes: Ocasiao[];
   aquecimento: Aquecimento | null;
   material: Material | null;
-  ocasioes: Ocasiao[];
+  corNome: string;
+  hex: string;
+  colorAddSymbol: string;
+  /** Segunda cor de peças listradas ou estampadas; a visão ainda não preenche. */
+  corSecundariaNome: string | null;
+  hexSecundario: string | null;
+  colorAddSymbolSecundario: string | null;
   criadoEm: string;
   atualizadoEm: string;
 };
 
-export type CadastrarRoupaInput = {
+export type CadastrarPecaInput = {
   photoUri: string;
+  /** Sem a cor completa, o back lê a cor da foto sozinho. */
   corNome?: string | null;
-  corHex?: string | null;
-  corColorAdd?: string | null;
+  hex?: string | null;
+  colorAddSymbol?: string | null;
 };
 
-export type AtualizarRoupaInput = Partial<
+export type AtualizarPecaInput = Partial<
   Pick<
-    Roupa,
-    | 'nome'
-    | 'corNome'
-    | 'corHex'
-    | 'corColorAdd'
+    Peca,
     | 'categoria'
     | 'estilo'
     | 'estampa'
+    | 'ocasioes'
     | 'aquecimento'
     | 'material'
-    | 'ocasioes'
+    | 'corNome'
+    | 'hex'
+    | 'colorAddSymbol'
+    | 'corSecundariaNome'
+    | 'hexSecundario'
+    | 'colorAddSymbolSecundario'
   >
 >;
 
@@ -98,17 +104,19 @@ export type AtualizarRoupaInput = Partial<
  * paga) e grava no banco — nessa ordem, e só segue se a anterior der certo.
  * Se a análise ou o banco falharem, a foto é apagada do S3.
  */
-export function cadastrarRoupa(input: CadastrarRoupaInput, token: string) {
+export function cadastrarPeca(input: CadastrarPecaInput, token: string) {
   const formData = new FormData();
 
   formData.append('foto', photoFormDataPart(input.photoUri, 'roupa.jpg'));
 
   // Campo vazio não vai: o back valida o hex e recusaria string vazia.
   if (input.corNome) formData.append('corNome', input.corNome);
-  if (input.corHex) formData.append('corHex', input.corHex);
-  if (input.corColorAdd) formData.append('corColorAdd', input.corColorAdd);
+  if (input.hex) formData.append('hex', input.hex);
+  if (input.colorAddSymbol) {
+    formData.append('colorAddSymbol', input.colorAddSymbol);
+  }
 
-  return apiRequest<Roupa>('/roupas', {
+  return apiRequest<Peca>('/pecas', {
     method: 'POST',
     body: formData,
     token,
@@ -117,24 +125,24 @@ export function cadastrarRoupa(input: CadastrarRoupaInput, token: string) {
   });
 }
 
-export function listarRoupas(token: string) {
-  return apiRequest<Roupa[]>('/roupas', { token });
+export function listarPecas(token: string) {
+  return apiRequest<Peca[]>('/pecas', { token });
 }
 
-export function atualizarRoupa(
+export function atualizarPeca(
   id: string,
-  dados: AtualizarRoupaInput,
+  dados: AtualizarPecaInput,
   token: string,
 ) {
-  return apiRequest<Roupa>(`/roupas/${id}`, {
+  return apiRequest<Peca>(`/pecas/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(dados),
     token,
   });
 }
 
-export function removerRoupa(id: string, token: string) {
-  return apiRequest<{ message: string }>(`/roupas/${id}`, {
+export function removerPeca(id: string, token: string) {
+  return apiRequest<{ message: string }>(`/pecas/${id}`, {
     method: 'DELETE',
     token,
   });

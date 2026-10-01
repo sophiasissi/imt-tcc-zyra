@@ -1,11 +1,11 @@
 import { Image, StyleSheet, Text, View } from 'react-native';
 
-import { CATEGORIA_LABEL, Roupa } from '../services/roupasApi';
+import { CATEGORIA_LABEL, Peca } from '../services/pecasApi';
 import { theme } from '../styles/theme';
 import { getColorAddSymbol } from '../utils/colorAddSymbols';
 
 type Props = {
-  roupa: Roupa;
+  peca: Peca;
 };
 
 /**
@@ -14,10 +14,10 @@ type Props = {
  * A cor nunca aparece só pela foto — sempre com o nome escrito e o símbolo,
  * para quem não distingue a tonalidade na imagem.
  */
-export function ClosetItemCard({ roupa }: Props) {
-  const symbol = getColorAddSymbol(roupa.corColorAdd);
-  const nomeCor = symbol?.label ?? roupa.corNome ?? null;
-  const categoria = roupa.categoria ? CATEGORIA_LABEL[roupa.categoria] : null;
+export function ClosetItemCard({ peca }: Props) {
+  const symbol = getColorAddSymbol(peca.colorAddSymbol);
+  const nomeCor = symbol?.label ?? peca.corNome;
+  const categoria = CATEGORIA_LABEL[peca.categoria];
   const descricao = [categoria, nomeCor].filter(Boolean).join(', ');
 
   return (
@@ -26,7 +26,7 @@ export function ClosetItemCard({ roupa }: Props) {
       accessible
       accessibilityLabel={descricao || 'Peça do seu armário'}
     >
-      <Image source={{ uri: roupa.imagemUrl }} style={styles.photo} />
+      <Image source={{ uri: peca.imagemUrl }} style={styles.photo} />
 
       {nomeCor ? (
         <View style={styles.colorTag}>

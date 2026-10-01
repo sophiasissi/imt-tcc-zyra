@@ -15,7 +15,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { getColorAddSymbol } from '../utils/colorAddSymbols';
 import { theme } from '../styles/theme';
 import { useAuth } from '../contexts/AuthContext';
-import { cadastrarRoupa } from '../services/roupasApi';
+import { cadastrarPeca } from '../services/pecasApi';
 import { ZyraButton } from '../components/ZyraButton';
 import { ZyraLoadingPopup } from '../components/ZyraLoadingPopup';
 import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
@@ -32,7 +32,7 @@ const CADASTRO_STEPS = [
 ];
 
 export function CapturedClothingScreen({ navigation, route }: Props) {
-  const { photoUri, colorName, colorAddSymbol, corHex } = route.params;
+  const { photoUri, colorName, colorAddSymbol, hex } = route.params;
   const { tokens } = useAuth();
 
   const [isCadastrando, setIsCadastrando] = useState(false);
@@ -59,12 +59,12 @@ export function CapturedClothingScreen({ navigation, route }: Props) {
     setIsCadastrando(true);
 
     try {
-      await cadastrarRoupa(
+      await cadastrarPeca(
         {
           photoUri,
           corNome: colorName,
-          corHex,
-          corColorAdd: colorAddSymbol,
+          hex,
+          colorAddSymbol,
         },
         accessToken,
       );
