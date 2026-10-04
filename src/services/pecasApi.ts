@@ -14,8 +14,7 @@ export type Categoria =
   | 'SAIA'
   | 'VESTIDO'
   | 'TENIS'
-  | 'SAPATO'
-  | 'BOLSA';
+  | 'SAPATO';
 export type Estilo =
   | 'CASUAL'
   | 'SOCIAL'
@@ -47,7 +46,6 @@ export const CATEGORIA_LABEL: Record<Categoria, string> = {
   VESTIDO: 'vestido',
   TENIS: 'tênis',
   SAPATO: 'sapato',
-  BOLSA: 'bolsa',
 };
 
 /** Peça do closet como o back devolve (model `Peca` do Prisma). */
