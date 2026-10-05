@@ -6,6 +6,7 @@ import {
   KeyboardEvent,
   PanResponder,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -16,10 +17,17 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 
+import { ClosetItemCard } from '../components/ClosetItemCard';
+import { useAuth } from '../contexts/AuthContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { ApiError } from '../services/api';
+import {
+  MensagemHistorico,
+  PecaDoLook,
+  sugerirLook,
+} from '../services/looksApi';
 import { theme } from '../styles/theme';
 import CameraSvg from '../../assets/icons/camera.svg';
-import LookCompleto from '../../assets/images/look_completo.svg';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Chat'>;
 
@@ -32,8 +40,11 @@ type Message = {
 const COLLAPSED_PANEL_HEIGHT = 320;
 const EXPANDED_PANEL_TOP = 115;
 
-// Tempo provisório usado somente na apresentação, até a integração da API.
-const DEMO_LOOK_GENERATION_DELAY_MS = 2800;
+// Quantas mensagens anteriores vão junto, para o back entender respostas curtas.
+const MENSAGENS_DE_CONTEXTO = 6;
+
+const ERRO_PADRAO =
+  'Não consegui montar o look agora. Tente de novo em instantes.';
 
 export function ChatScreen({ navigation }: Props) {
   // Mantém a altura original da tela para o painel não mudar de posição
@@ -55,14 +66,15 @@ export function ChatScreen({ navigation }: Props) {
   const exitGestureTriggered = React.useRef(false);
   const expandedState = React.useRef(false);
   const isClosing = React.useRef(false);
-  const isLookReadyRef = React.useRef(false);
-  const generationTimer = React.useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
+  const isMounted = React.useRef(true);
+
+  const { tokens } = useAuth();
+  const accessToken = tokens?.accessToken ?? null;
 
   const [inputText, setInputText] = React.useState('');
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [isLookReady, setIsLookReady] = React.useState(false);
+  const [lookPecas, setLookPecas] = React.useState<PecaDoLook[]>([]);
   const [messages, setMessages] = React.useState<Message[]>([
     {
       id: 'initial-question',
@@ -119,6 +131,8 @@ export function ChatScreen({ navigation }: Props) {
   }, [inputBottom]);
 
   React.useEffect(() => {
+    isMounted.current = true;
+
     const frameId = requestAnimationFrame(() => {
       openChatPanel();
 
@@ -134,9 +148,7 @@ export function ChatScreen({ navigation }: Props) {
       panelTranslateY.stopAnimation();
       inputBottom.stopAnimation();
 
-      if (generationTimer.current) {
-        clearTimeout(generationTimer.current);
-      }
+      isMounted.current = false;
     };
     // A animação inicial só deve executar quando a tela abrir.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -159,7 +171,6 @@ export function ChatScreen({ navigation }: Props) {
   }
 
   function showLookWithCollapsedChat() {
-    isLookReadyRef.current = true;
     setIsLookReady(true);
     setIsGenerating(false);
     expandedState.current = false;
@@ -290,12 +301,31 @@ export function ChatScreen({ navigation }: Props) {
     console.log('[Chat] Usuário acessou a câmera.');
   }
 
-  function handleSend() {
+  function replaceLoadingMessage(loadingId: string, text: string) {
+    setMessages((currentMessages) =>
+      currentMessages.map((message) =>
+        message.id === loadingId ? { ...message, text } : message,
+      ),
+    );
+  }
+
+  async function handleSend() {
     const normalizedText = inputText.trim();
 
-    if (!normalizedText || isGenerating || isLookReadyRef.current) {
+    if (!normalizedText || isGenerating || !accessToken) {
       return;
     }
+
+    // Contexto da conversa antes desta mensagem (sem as mensagens de "Gerando...").
+    const historico: MensagemHistorico[] = messages
+      .filter((message) => !message.id.startsWith('loading-'))
+      .slice(-MENSAGENS_DE_CONTEXTO)
+      .map((message) => ({
+        autor: message.author === 'user' ? 'usuario' : 'zyra',
+        texto: message.text,
+      }));
+
+    const loadingId = `loading-${Date.now()}`;
 
     setMessages((currentMessages) => [
       ...currentMessages,
@@ -305,7 +335,7 @@ export function ChatScreen({ navigation }: Props) {
         text: normalizedText,
       },
       {
-        id: `loading-${Date.now()}`,
+        id: loadingId,
         author: 'zyra',
         text: 'Gerando um look...',
       },
@@ -315,9 +345,48 @@ export function ChatScreen({ navigation }: Props) {
     setIsGenerating(true);
     Keyboard.dismiss();
 
-    generationTimer.current = setTimeout(() => {
-      showLookWithCollapsedChat();
-    }, DEMO_LOOK_GENERATION_DELAY_MS);
+    try {
+      const resposta = await sugerirLook(
+        {
+          mensagem: normalizedText,
+          historico,
+          pecasAnteriores: lookPecas.map((peca) => peca.id),
+        },
+        accessToken,
+      );
+
+      if (!isMounted.current) {
+        return;
+      }
+
+      const avisos =
+        resposta.tipo === 'LOOK' || resposta.tipo === 'SEM_LOOK'
+          ? resposta.avisos
+          : [];
+      replaceLoadingMessage(
+        loadingId,
+        [resposta.mensagem, ...avisos].join('\n\n'),
+      );
+
+      if (resposta.tipo === 'LOOK') {
+        setLookPecas(resposta.pecas);
+        showLookWithCollapsedChat();
+        return;
+      }
+    } catch (error) {
+      console.error('[Chat] Falha ao sugerir look:', error);
+
+      if (isMounted.current) {
+        replaceLoadingMessage(
+          loadingId,
+          error instanceof ApiError ? error.message : ERRO_PADRAO,
+        );
+      }
+    }
+
+    if (isMounted.current) {
+      setIsGenerating(false);
+    }
   }
 
   return (
@@ -337,9 +406,15 @@ export function ChatScreen({ navigation }: Props) {
               <Text style={styles.backButtonIcon}>←</Text>
             </TouchableOpacity>
 
-            <View pointerEvents="none" style={styles.lookImageContainer}>
-              <LookCompleto style={styles.lookImage} />
-            </View>
+            <ScrollView
+              style={styles.lookScroll}
+              contentContainerStyle={styles.lookGrid}
+              accessibilityLabel="Peças do look sugerido"
+            >
+              {lookPecas.map((peca) => (
+                <ClosetItemCard key={peca.id} peca={peca} />
+              ))}
+            </ScrollView>
           </Animated.View>
         ) : null}
 
@@ -403,11 +478,11 @@ export function ChatScreen({ navigation }: Props) {
               onChangeText={setInputText}
               returnKeyType="send"
               onSubmitEditing={handleSend}
-              editable={!isGenerating && !isLookReady}
+              editable={!isGenerating}
               maxLength={250}
             />
 
-            {inputText.trim().length > 0 && !isGenerating && !isLookReady ? (
+            {inputText.trim().length > 0 && !isGenerating ? (
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel="Enviar mensagem"
@@ -424,7 +499,7 @@ export function ChatScreen({ navigation }: Props) {
                 activeOpacity={0.8}
                 style={styles.cameraButton}
                 onPress={handleCamera}
-                disabled={isGenerating || isLookReady}
+                disabled={isGenerating}
               >
                 <CameraSvg width={24} height={24} />
               </TouchableOpacity>
@@ -478,14 +553,15 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontFamily: theme.fonts.semiBold,
   },
-  lookImageContainer: {
+  lookScroll: {
     width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  lookImage: {
-    alignSelf: 'center',
+  lookGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    paddingBottom: 8,
   },
   chatPanel: {
     position: 'absolute',
