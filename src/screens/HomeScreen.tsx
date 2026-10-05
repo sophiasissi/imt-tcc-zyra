@@ -1,6 +1,7 @@
 import {
   ActivityIndicator,
   Animated,
+  Easing,
   PanResponder,
   ScrollView,
   StatusBar,
@@ -87,6 +88,9 @@ export function HomeScreen({ navigation }: Props) {
   const [panelTranslateY] = React.useState(
     () => new Animated.Value(collapsedTranslateY),
   );
+  // Conteúdo do armário (título e roupas): some quando o chat abre por cima e
+  // volta quando ele fecha, para a troca entre as telas não ser um corte seco.
+  const [closetContent] = React.useState(() => new Animated.Value(1));
   const currentPanelPosition = React.useRef(collapsedTranslateY);
   const dragStartPosition = React.useRef(collapsedTranslateY);
   const collapsedPosition = React.useRef(collapsedTranslateY);
@@ -196,8 +200,31 @@ export function HomeScreen({ navigation }: Props) {
   }
 
   function handleChat() {
-    navigation.navigate('Chat', { nome });
+    Animated.timing(closetContent, {
+      toValue: 0,
+      duration: 180,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+
+    navigation.navigate('Chat', {
+      nome,
+      armarioAberto: expandedState.current,
+    });
   }
+
+  // Ao voltar do chat (ou de qualquer tela), o armário reaparece subindo de leve.
+  useFocusEffect(
+    React.useCallback(() => {
+      Animated.timing(closetContent, {
+        toValue: 1,
+        duration: 260,
+        delay: 60,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }, [closetContent]),
+  );
 
   function handleCamera() {
     console.log('[Home] Usuário acessou a câmera.');
@@ -303,40 +330,57 @@ export function HomeScreen({ navigation }: Props) {
           <View style={styles.dragIndicator} />
         </View>
 
-        <View style={styles.closetHeader}>
-          <Text style={styles.closetTitle}>Seu Armário Digital</Text>
+        <Animated.View
+          style={[
+            styles.closetContent,
+            {
+              opacity: closetContent,
+              transform: [
+                {
+                  translateY: closetContent.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [16, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <View style={styles.closetHeader}>
+            <Text style={styles.closetTitle}>Seu Armário Digital</Text>
 
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Selecionar roupas"
-            activeOpacity={0.84}
-            style={styles.selectButton}
-            onPress={handleSelectCloset}
-          >
-            <Text style={styles.selectButtonText}>Selecionar</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Selecionar roupas"
+              activeOpacity={0.84}
+              style={styles.selectButton}
+              onPress={handleSelectCloset}
+            >
+              <Text style={styles.selectButtonText}>Selecionar</Text>
+            </TouchableOpacity>
+          </View>
 
-        {isLoadingPecas && pecas.length === 0 ? (
-          <ActivityIndicator
-            color={theme.colors.primary}
-            style={styles.closetFeedback}
-          />
-        ) : pecas.length === 0 ? (
-          <Text style={[styles.closetEmptyText, styles.closetFeedback]}>
-            {pecasError ??
-              'Seu armário ainda está vazio. Toque na câmera, fotografe uma peça e cadastre.'}
-          </Text>
-        ) : (
-          <ScrollView
-            contentContainerStyle={styles.clothingGrid}
-            showsVerticalScrollIndicator={false}
-          >
-            {pecas.map((peca) => (
-              <ClosetItemCard key={peca.id} peca={peca} />
-            ))}
-          </ScrollView>
-        )}
+          {isLoadingPecas && pecas.length === 0 ? (
+            <ActivityIndicator
+              color={theme.colors.primary}
+              style={styles.closetFeedback}
+            />
+          ) : pecas.length === 0 ? (
+            <Text style={[styles.closetEmptyText, styles.closetFeedback]}>
+              {pecasError ??
+                'Seu armário ainda está vazio. Toque na câmera, fotografe uma peça e cadastre.'}
+            </Text>
+          ) : (
+            <ScrollView
+              contentContainerStyle={styles.clothingGrid}
+              showsVerticalScrollIndicator={false}
+            >
+              {pecas.map((peca) => (
+                <ClosetItemCard key={peca.id} peca={peca} />
+              ))}
+            </ScrollView>
+          )}
+        </Animated.View>
       </Animated.View>
 
       <View style={styles.chatContainer}>
@@ -463,6 +507,9 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 999,
     backgroundColor: theme.colors.white,
+  },
+  closetContent: {
+    flex: 1,
   },
   closetHeader: {
     flexDirection: 'row',

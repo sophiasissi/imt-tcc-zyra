@@ -42,6 +42,8 @@ export type SugerirLookInput = {
   historico?: MensagemHistorico[];
   /** Peças do look anterior, para "quero outro" trazer algo diferente. */
   pecasAnteriores?: string[];
+  /** Peças dos últimos looks da conversa, para o back variar as sugestões. */
+  pecasRecentes?: string[];
 };
 
 export function sugerirLook(input: SugerirLookInput, token: string) {

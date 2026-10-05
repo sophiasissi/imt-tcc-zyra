@@ -109,6 +109,8 @@ export type RootStackParamList = {
 
   Chat: {
     nome?: string | null;
+    /** O armário estava aberto na Home: o painel do chat já começa no topo. */
+    armarioAberto?: boolean;
   };
 
   Settings: undefined;
