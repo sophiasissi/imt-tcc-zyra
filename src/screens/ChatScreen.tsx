@@ -1,7 +1,14 @@
+/* eslint-disable react-hooks/refs, react-hooks/immutability --
+ * Esta tela é toda feita de animações (Animated) e gestos (PanResponder) que
+ * são criados uma vez só e leem refs dentro dos callbacks de gesto e de
+ * animação, nunca no render. As regras do React Compiler não conseguem ver
+ * essa diferença e acusam o padrão inteiro da tela, que já existia antes.
+ */
 import React from 'react';
 import {
   Animated,
   Dimensions,
+  Easing,
   Keyboard,
   KeyboardEvent,
   PanResponder,
@@ -16,6 +23,7 @@ import {
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path } from 'react-native-svg';
 
 import { ClosetItemCard } from '../components/ClosetItemCard';
 import { useAuth } from '../contexts/AuthContext';
@@ -38,6 +46,32 @@ type Message = {
 };
 
 const COLLAPSED_PANEL_HEIGHT = 320;
+
+// Painel do chat: duração fixa e desaceleração suave. A mola anterior parecia
+// travar no começo e disparar no fim.
+const PANEL_ANIMATION_MS = 260;
+const PANEL_EASING = Easing.out(Easing.cubic);
+
+// Curva aproximada do teclado do iOS, para o campo de texto subir junto com ele.
+const KEYBOARD_EASING = Easing.bezier(0.38, 0.7, 0.125, 1);
+
+// Margens laterais da caixa de texto: na Home ela é mais estreita; no chat,
+// alarga com a mesma animação do painel (e volta ao sair).
+const HOME_INPUT_INSET = 52;
+const CHAT_INPUT_INSET = 24;
+
+// Quantas peças dos últimos looks o back evita repetir.
+const PECAS_RECENTES = 12;
+
+// Área das fotos do look: abaixo do cabeçalho e acima do chat recolhido.
+const HEADER_HEIGHT = 104;
+const LOOK_AREA_TOP = 160;
+const LOOK_AREA_SIDE = 16;
+const LOOK_GRID_GAP = 10;
+
+// Altura da barra de arraste e distância do campo de texto até o fim da tela.
+const DRAG_HANDLE_HEIGHT = 64;
+const INPUT_BOTTOM_GAP = 54;
 const EXPANDED_PANEL_TOP = 115;
 
 // Quantas mensagens anteriores vão junto, para o back entender respostas curtas.
@@ -46,25 +80,41 @@ const MENSAGENS_DE_CONTEXTO = 6;
 const ERRO_PADRAO =
   'Não consegui montar o look agora. Tente de novo em instantes.';
 
-export function ChatScreen({ navigation }: Props) {
+export function ChatScreen({ navigation, route }: Props) {
+  // Armário aberto na Home: o painel já está no topo. O chat nasce ali mesmo e
+  // só troca o conteúdo, sem a barra branca subir ou descer.
+  const startsExpanded = route.params?.armarioAberto ?? false;
+
   // Mantém a altura original da tela para o painel não mudar de posição
   // quando o teclado aparecer. Apenas o input sobe com o teclado.
   const screenHeight = React.useRef(Dimensions.get('window').height).current;
+  const screenWidth = React.useRef(Dimensions.get('window').width).current;
   const expandedPanelHeight = screenHeight - EXPANDED_PANEL_TOP;
   const collapsedTranslateY = expandedPanelHeight - COLLAPSED_PANEL_HEIGHT;
 
   const panelTranslateY = React.useRef(
-    new Animated.Value(collapsedTranslateY),
+    new Animated.Value(startsExpanded ? 0 : collapsedTranslateY),
   ).current;
   const inputBottom = React.useRef(new Animated.Value(30)).current;
+  const inputInset = React.useRef(new Animated.Value(HOME_INPUT_INSET)).current;
   const conversationOpacity = React.useRef(new Animated.Value(0)).current;
   const resultOpacity = React.useRef(new Animated.Value(0)).current;
 
-  const currentPanelPosition = React.useRef(collapsedTranslateY);
-  const dragStartPosition = React.useRef(collapsedTranslateY);
+  const homePanelPosition = startsExpanded ? 0 : collapsedTranslateY;
+  const currentPanelPosition = React.useRef(homePanelPosition);
+  const dragStartPosition = React.useRef(homePanelPosition);
   const wasDragged = React.useRef(false);
   const exitGestureTriggered = React.useRef(false);
   const expandedState = React.useRef(false);
+  // Lido dentro do PanResponder, que é criado uma vez só e não vê o estado novo.
+  const isLookReadyRef = React.useRef(false);
+  const messagesScrollRef = React.useRef<ScrollView>(null);
+  const inputRef = React.useRef<TextInput>(null);
+  const recentPecaIds = React.useRef<string[]>([]);
+  const messagesScrollY = React.useRef(0);
+  const messagesViewportHeight = React.useRef(0);
+  const messagesContentHeight = React.useRef(0);
+  const isKeyboardVisible = React.useRef(false);
   const isClosing = React.useRef(false);
   const isMounted = React.useRef(true);
 
@@ -75,6 +125,13 @@ export function ChatScreen({ navigation }: Props) {
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [isLookReady, setIsLookReady] = React.useState(false);
   const [lookPecas, setLookPecas] = React.useState<PecaDoLook[]>([]);
+  const [isPanelExpanded, setIsPanelExpanded] = React.useState(true);
+  // O campo de texto cresce com o texto; a lista de mensagens abre espaço para ele.
+  const [inputHeight, setInputHeight] = React.useState(56);
+  // A conversa só rola quando não cabe na tela. Rolagem ligada à toa faz o
+  // iPhone tomar o gesto para si, e o painel não recolhe nem abre.
+  const [isConversationScrollable, setIsConversationScrollable] =
+    React.useState(false);
   const [messages, setMessages] = React.useState<Message[]>([
     {
       id: 'initial-question',
@@ -95,17 +152,21 @@ export function ChatScreen({ navigation }: Props) {
 
   React.useEffect(() => {
     function moveInputAboveKeyboard(event: KeyboardEvent) {
+      isKeyboardVisible.current = true;
       Animated.timing(inputBottom, {
         toValue: event.endCoordinates.height + 16,
-        duration: event.duration ?? 220,
+        duration: event.duration || 250,
+        easing: KEYBOARD_EASING,
         useNativeDriver: false,
       }).start();
     }
 
     function resetInputPosition(event?: KeyboardEvent) {
+      isKeyboardVisible.current = false;
       Animated.timing(inputBottom, {
         toValue: 30,
-        duration: event?.duration ?? 180,
+        duration: event?.duration || 250,
+        easing: KEYBOARD_EASING,
         useNativeDriver: false,
       }).start();
     }
@@ -136,6 +197,17 @@ export function ChatScreen({ navigation }: Props) {
     const frameId = requestAnimationFrame(() => {
       openChatPanel();
 
+      // Quem tocou na caixa de texto da Home quer escrever: o teclado já abre
+      // junto com o chat, sem precisar tocar de novo.
+      inputRef.current?.focus();
+
+      Animated.timing(inputInset, {
+        toValue: CHAT_INPUT_INSET,
+        duration: PANEL_ANIMATION_MS,
+        easing: PANEL_EASING,
+        useNativeDriver: false,
+      }).start();
+
       Animated.timing(conversationOpacity, {
         toValue: 1,
         duration: 210,
@@ -154,15 +226,23 @@ export function ChatScreen({ navigation }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  React.useEffect(() => {
+    const id = setTimeout(
+      () => messagesScrollRef.current?.scrollToEnd({ animated: false }),
+      50,
+    );
+    return () => clearTimeout(id);
+  }, [isPanelExpanded]);
+
   function openChatPanel() {
     expandedState.current = true;
+    setIsPanelExpanded(true);
 
-    Animated.spring(panelTranslateY, {
+    Animated.timing(panelTranslateY, {
       toValue: 0,
+      duration: PANEL_ANIMATION_MS,
+      easing: PANEL_EASING,
       useNativeDriver: true,
-      damping: 22,
-      stiffness: 180,
-      mass: 0.85,
     }).start(({ finished }) => {
       if (finished) {
         currentPanelPosition.current = 0;
@@ -170,8 +250,40 @@ export function ChatScreen({ navigation }: Props) {
     });
   }
 
+  function collapseChatPanel() {
+    expandedState.current = false;
+    Keyboard.dismiss();
+
+    Animated.timing(panelTranslateY, {
+      toValue: collapsedTranslateY,
+      duration: PANEL_ANIMATION_MS,
+      easing: PANEL_EASING,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+        currentPanelPosition.current = collapsedTranslateY;
+        setIsPanelExpanded(false);
+      }
+    });
+  }
+
+  /**
+   * Com um look na tela, a barra do chat só abre e fecha a conversa: sair e
+   * apagar o look fica só com a seta de voltar. Antes do primeiro look, o
+   * gesto continua voltando para a Home, como antes.
+   */
+  function toggleChatPanel() {
+    if (expandedState.current) {
+      collapseChatPanel();
+    } else {
+      openChatPanel();
+    }
+  }
+
   function showLookWithCollapsedChat() {
+    isLookReadyRef.current = true;
     setIsLookReady(true);
+    setIsPanelExpanded(false);
     setIsGenerating(false);
     expandedState.current = false;
     Keyboard.dismiss();
@@ -182,12 +294,11 @@ export function ChatScreen({ navigation }: Props) {
         duration: 260,
         useNativeDriver: true,
       }),
-      Animated.spring(panelTranslateY, {
+      Animated.timing(panelTranslateY, {
         toValue: collapsedTranslateY,
+        duration: PANEL_ANIMATION_MS,
+        easing: PANEL_EASING,
         useNativeDriver: true,
-        damping: 22,
-        stiffness: 180,
-        mass: 0.85,
       }),
     ]).start(({ finished }) => {
       if (finished) {
@@ -206,12 +317,17 @@ export function ChatScreen({ navigation }: Props) {
     Keyboard.dismiss();
 
     Animated.parallel([
-      Animated.spring(panelTranslateY, {
-        toValue: collapsedTranslateY,
+      Animated.timing(inputInset, {
+        toValue: HOME_INPUT_INSET,
+        duration: PANEL_ANIMATION_MS,
+        easing: PANEL_EASING,
+        useNativeDriver: false,
+      }),
+      Animated.timing(panelTranslateY, {
+        toValue: homePanelPosition,
+        duration: PANEL_ANIMATION_MS,
+        easing: PANEL_EASING,
         useNativeDriver: true,
-        damping: 22,
-        stiffness: 180,
-        mass: 0.85,
       }),
       Animated.timing(conversationOpacity, {
         toValue: 0,
@@ -233,72 +349,155 @@ export function ChatScreen({ navigation }: Props) {
     });
   }
 
+  // A lista rola até o fim sozinha; guarda a posição e se a conversa cabe na
+  // área visível (que muda quando o painel abre ou recolhe). O onScroll nem
+  // sempre dispara no scrollToEnd, então a posição é calculada aqui.
+  function atualizarRolagemDaConversa() {
+    const sobra =
+      messagesContentHeight.current - messagesViewportHeight.current;
+    messagesScrollY.current = Math.max(sobra, 0);
+    setIsConversationScrollable(sobra > 1);
+  }
+
+  function podeAbrirArrastando() {
+    const fimDaLista =
+      messagesContentHeight.current - messagesViewportHeight.current;
+    return (
+      isLookReadyRef.current &&
+      !expandedState.current &&
+      messagesScrollY.current >= fimDaLista - 1
+    );
+  }
+
+  // Chamada só durante o gesto: lê o estado atual do painel e da rolagem.
+  function podeRecolherArrastando() {
+    return expandedState.current && messagesScrollY.current <= 0;
+  }
+
+  // Mesmo comportamento para a barra de arraste e para o resto do painel.
+  const panelGestures: Parameters<typeof PanResponder.create>[0] = {
+    onPanResponderTerminationRequest: () => false,
+
+    onPanResponderGrant: () => {
+      wasDragged.current = false;
+      exitGestureTriggered.current = false;
+      panelTranslateY.stopAnimation();
+      dragStartPosition.current = currentPanelPosition.current;
+    },
+
+    onPanResponderMove: (_, gestureState) => {
+      if (isClosing.current || exitGestureTriggered.current) {
+        return;
+      }
+
+      if (Math.abs(gestureState.dy) > 4) {
+        wasDragged.current = true;
+      }
+
+      // Fecha o teclado assim que o gesto para baixo começa: se esperasse o
+      // dedo soltar, o painel já teria descido e a caixa de texto ficava para trás.
+      if (gestureState.dy > 12 && isKeyboardVisible.current) {
+        Keyboard.dismiss();
+      }
+
+      const nextPosition = dragStartPosition.current + gestureState.dy;
+      const limitedPosition = Math.max(
+        0,
+        Math.min(collapsedTranslateY, nextPosition),
+      );
+
+      // Antes do primeiro look, com o armário aberto na Home, o painel fica
+      // parado: o gesto só fecha o chat e o conteúdo troca de volta.
+      if (!(startsExpanded && !isLookReadyRef.current)) {
+        panelTranslateY.setValue(limitedPosition);
+      }
+
+      // Sem look na tela, um gesto claro para baixo já volta para a Home.
+      if (!isLookReadyRef.current && gestureState.dy > 18) {
+        exitGestureTriggered.current = true;
+        returnToHome();
+      }
+    },
+
+    onPanResponderRelease: (_, gestureState) => {
+      if (exitGestureTriggered.current || isClosing.current) {
+        return;
+      }
+
+      const puxouParaBaixo = gestureState.dy > 0 || gestureState.vy > 0.25;
+
+      if (isLookReadyRef.current) {
+        if (!wasDragged.current) {
+          toggleChatPanel();
+        } else if (puxouParaBaixo) {
+          collapseChatPanel();
+        } else {
+          openChatPanel();
+        }
+        return;
+      }
+
+      if (!wasDragged.current || puxouParaBaixo) {
+        returnToHome();
+        return;
+      }
+
+      openChatPanel();
+    },
+
+    onPanResponderTerminate: () => {
+      if (isClosing.current) {
+        return;
+      }
+      // Volta para onde estava: com look na tela, o painel pode estar recolhido.
+      if (isLookReadyRef.current && !expandedState.current) {
+        collapseChatPanel();
+      } else {
+        openChatPanel();
+      }
+    },
+  };
+
+  // Barra de arraste: qualquer toque ou arraste vale.
   const panelPanResponder = React.useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gestureState) =>
         Math.abs(gestureState.dy) > 2,
-      onPanResponderTerminationRequest: () => false,
+      ...panelGestures,
+    }),
+  ).current;
 
-      onPanResponderGrant: () => {
-        wasDragged.current = false;
-        exitGestureTriggered.current = false;
-        panelTranslateY.stopAnimation();
-        dragStartPosition.current = currentPanelPosition.current;
+  // Resto do painel (área das mensagens): só assume o gesto quando ele é
+  // claramente vertical e não serve para rolar a conversa — puxar para baixo
+  // com a conversa no topo, ou puxar para cima com o chat recolhido.
+  const panelBodyPanResponder = React.useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+        const vertical =
+          Math.abs(gestureState.dy) > 10 &&
+          Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.5;
+
+        if (!vertical) {
+          return false;
+        }
+
+        // Puxar para baixo recolhe o chat só se ele estiver aberto e a conversa
+        // no topo; recolhido, o gesto rola o histórico.
+        if (gestureState.dy > 0) {
+          return podeRecolherArrastando();
+        }
+
+        // Para cima com o chat recolhido: primeiro a lista volta até a última
+        // mensagem; só no fim dela o gesto abre o chat inteiro.
+        return podeAbrirArrastando();
       },
-
-      onPanResponderMove: (_, gestureState) => {
-        if (isClosing.current || exitGestureTriggered.current) {
-          return;
-        }
-
-        if (Math.abs(gestureState.dy) > 4) {
-          wasDragged.current = true;
-        }
-
-        const nextPosition = dragStartPosition.current + gestureState.dy;
-        const limitedPosition = Math.max(
-          0,
-          Math.min(collapsedTranslateY, nextPosition),
-        );
-
-        panelTranslateY.setValue(limitedPosition);
-
-        // No chat, iniciar um gesto claro para baixo já faz a saída acontecer.
-        if (gestureState.dy > 18) {
-          exitGestureTriggered.current = true;
-          returnToHome();
-        }
-      },
-
-      onPanResponderRelease: (_, gestureState) => {
-        if (exitGestureTriggered.current || isClosing.current) {
-          return;
-        }
-
-        if (!wasDragged.current) {
-          returnToHome();
-          return;
-        }
-
-        if (gestureState.dy > 0 || gestureState.vy > 0.25) {
-          returnToHome();
-          return;
-        }
-
-        openChatPanel();
-      },
-
-      onPanResponderTerminate: () => {
-        if (!isClosing.current) {
-          openChatPanel();
-        }
-      },
+      ...panelGestures,
     }),
   ).current;
 
   function handleCamera() {
-    console.log('[Chat] Usuário acessou a câmera.');
+    navigation.navigate('CameraColorDetection');
   }
 
   function replaceLoadingMessage(loadingId: string, text: string) {
@@ -308,6 +507,24 @@ export function ChatScreen({ navigation }: Props) {
       ),
     );
   }
+
+  // Cards do look em duas colunas, do maior tamanho que cabe acima do chat.
+  const lookCardSize = React.useMemo(() => {
+    const colunas = lookPecas.length > 1 ? 2 : 1;
+    const linhas = Math.max(Math.ceil(lookPecas.length / colunas), 1);
+    const largura =
+      (screenWidth - LOOK_AREA_SIDE * 2 - LOOK_GRID_GAP * (colunas - 1)) /
+      colunas;
+    const alturaLivre =
+      screenHeight -
+      LOOK_AREA_TOP -
+      COLLAPSED_PANEL_HEIGHT -
+      10 -
+      LOOK_GRID_GAP * (linhas - 1);
+    const altura = Math.min(alturaLivre / linhas, largura * 1.35);
+
+    return { width: Math.min(largura, altura), height: altura };
+  }, [lookPecas.length, screenHeight, screenWidth]);
 
   async function handleSend() {
     const normalizedText = inputText.trim();
@@ -341,7 +558,10 @@ export function ChatScreen({ navigation }: Props) {
       },
     ]);
 
+    // No iOS, um TextInput multilinha controlado às vezes reaparece com o texto
+    // depois do envio; o clear() direto no campo garante que ele esvazie.
     setInputText('');
+    inputRef.current?.clear();
     setIsGenerating(true);
     Keyboard.dismiss();
 
@@ -351,6 +571,7 @@ export function ChatScreen({ navigation }: Props) {
           mensagem: normalizedText,
           historico,
           pecasAnteriores: lookPecas.map((peca) => peca.id),
+          pecasRecentes: recentPecaIds.current,
         },
         accessToken,
       );
@@ -369,6 +590,10 @@ export function ChatScreen({ navigation }: Props) {
       );
 
       if (resposta.tipo === 'LOOK') {
+        recentPecaIds.current = [
+          ...recentPecaIds.current,
+          ...resposta.pecas.map((peca) => peca.id),
+        ].slice(-PECAS_RECENTES);
         setLookPecas(resposta.pecas);
         showLookWithCollapsedChat();
         return;
@@ -412,7 +637,11 @@ export function ChatScreen({ navigation }: Props) {
               accessibilityLabel="Peças do look sugerido"
             >
               {lookPecas.map((peca) => (
-                <ClosetItemCard key={peca.id} peca={peca} />
+                <ClosetItemCard
+                  key={peca.id}
+                  peca={peca}
+                  style={lookCardSize}
+                />
               ))}
             </ScrollView>
           </Animated.View>
@@ -426,11 +655,16 @@ export function ChatScreen({ navigation }: Props) {
               transform: [{ translateY: panelTranslateY }],
             },
           ]}
+          {...panelBodyPanResponder.panHandlers}
         >
           <View
             accessible
             accessibilityRole="button"
-            accessibilityLabel="Fechar conversa e voltar para a tela inicial"
+            accessibilityLabel={
+              isLookReady
+                ? 'Abrir ou recolher a conversa'
+                : 'Fechar conversa e voltar para a tela inicial'
+            }
             accessibilityHint="Toque ou arraste para baixo"
             style={styles.dragHandle}
             {...panelPanResponder.panHandlers}
@@ -439,45 +673,103 @@ export function ChatScreen({ navigation }: Props) {
           </View>
 
           <Animated.View
-            style={[styles.messagesContainer, { opacity: conversationOpacity }]}
+            style={[
+              styles.messagesContainer,
+              // Recolhido, só o topo do painel aparece: a lista cabe entre a
+              // barra de arraste e o campo de texto.
+              !isPanelExpanded && {
+                flex: 0,
+                height:
+                  COLLAPSED_PANEL_HEIGHT -
+                  DRAG_HANDLE_HEIGHT -
+                  inputHeight -
+                  INPUT_BOTTOM_GAP,
+              },
+              { opacity: conversationOpacity },
+            ]}
           >
-            {messages.map((message) =>
-              message.author === 'zyra' ? (
-                <View key={message.id} style={styles.zyraMessageRow}>
-                  <View style={styles.messageIndicatorShadow}>
-                    <LinearGradient
-                      colors={['#DE0051', '#AB003E', '#78002C']}
-                      locations={[0.3, 0.67, 1]}
-                      start={{ x: 1, y: 0 }}
-                      end={{ x: 0, y: 1 }}
-                      style={styles.messageIndicator}
-                    />
-                  </View>
+            <ScrollView
+              ref={messagesScrollRef}
+              contentContainerStyle={[
+                styles.messagesContent,
+                {
+                  paddingBottom: isPanelExpanded
+                    ? inputHeight + INPUT_BOTTOM_GAP + 20
+                    : 8,
+                },
+              ]}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              scrollEventThrottle={16}
+              onScroll={(event) => {
+                messagesScrollY.current = event.nativeEvent.contentOffset.y;
+              }}
+              scrollEnabled={isConversationScrollable}
+              bounces={false}
+              onLayout={(event) => {
+                messagesViewportHeight.current =
+                  event.nativeEvent.layout.height;
+                atualizarRolagemDaConversa();
+              }}
+              onContentSizeChange={(_, altura) => {
+                messagesContentHeight.current = altura;
+                messagesScrollRef.current?.scrollToEnd({ animated: true });
+                atualizarRolagemDaConversa();
+              }}
+            >
+              {messages.map((message) =>
+                message.author === 'zyra' ? (
+                  <View key={message.id} style={styles.zyraMessageRow}>
+                    <View style={styles.messageIndicatorShadow}>
+                      <LinearGradient
+                        colors={['#DE0051', '#AB003E', '#78002C']}
+                        locations={[0.3, 0.67, 1]}
+                        start={{ x: 1, y: 0 }}
+                        end={{ x: 0, y: 1 }}
+                        style={styles.messageIndicator}
+                      />
+                    </View>
 
-                  <Text style={styles.zyraMessageText}>{message.text}</Text>
-                </View>
-              ) : (
-                <View key={message.id} style={styles.userMessage}>
-                  <Text style={styles.userMessageText}>{message.text}</Text>
-                </View>
-              ),
-            )}
+                    <Text style={styles.zyraMessageText}>{message.text}</Text>
+                  </View>
+                ) : (
+                  <View key={message.id} style={styles.userMessage}>
+                    <Text style={styles.userMessageText}>{message.text}</Text>
+                  </View>
+                ),
+              )}
+            </ScrollView>
           </Animated.View>
         </Animated.View>
 
-        <Animated.View style={[styles.chatContainer, { bottom: inputBottom }]}>
+        <Animated.View
+          style={[
+            styles.chatContainer,
+            { bottom: inputBottom, left: inputInset, right: inputInset },
+          ]}
+          onLayout={(event) => setInputHeight(event.nativeEvent.layout.height)}
+        >
           <View pointerEvents="none" style={styles.chatInputGlow} />
 
           <View style={styles.chatInput}>
             <TextInput
+              ref={inputRef}
               accessibilityLabel="Mensagem para o ZYRA"
               placeholder="Fale com o ZYRA..."
               placeholderTextColor={theme.colors.titleZyra}
               style={styles.textInput}
               value={inputText}
               onChangeText={setInputText}
+              multiline
+              // Enter envia; o texto longo quebra a linha sozinho.
+              submitBehavior="submit"
               returnKeyType="send"
               onSubmitEditing={handleSend}
+              onFocus={() => {
+                if (isLookReadyRef.current && !expandedState.current) {
+                  openChatPanel();
+                }
+              }}
               editable={!isGenerating}
               maxLength={250}
             />
@@ -490,7 +782,24 @@ export function ChatScreen({ navigation }: Props) {
                 style={styles.sendButton}
                 onPress={handleSend}
               >
-                <Text style={styles.sendButtonText}>↑</Text>
+                <LinearGradient
+                  colors={['#DE0051', '#AB003E', '#78002C']}
+                  locations={[0.3, 0.67, 1]}
+                  start={{ x: 1, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                  style={styles.sendButtonGradient}
+                >
+                  <Svg width={18} height={18} viewBox="0 0 24 24">
+                    <Path
+                      d="M12 19V5M5 12l7-7 7 7"
+                      stroke="#FFFFFF"
+                      strokeWidth={2.6}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                  </Svg>
+                </LinearGradient>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
@@ -516,19 +825,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
   },
+  // Começa abaixo do cabeçalho da Home (ZYRA e ícones) e cobre o resto da tela:
+  // a tela do chat é transparente, e sem isso o painel do armário da Home
+  // aparecia por trás do chat recolhido.
   lookResultLayer: {
     position: 'absolute',
-    top: 104,
+    top: HEADER_HEIGHT,
     left: 0,
     right: 0,
-    bottom: COLLAPSED_PANEL_HEIGHT,
+    bottom: 0,
     backgroundColor: theme.colors.background,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2,
-    paddingTop: 38,
-    paddingHorizontal: 16,
-    paddingBottom: 10,
+    paddingTop: LOOK_AREA_TOP - HEADER_HEIGHT,
+    paddingHorizontal: LOOK_AREA_SIDE,
+    paddingBottom: COLLAPSED_PANEL_HEIGHT + 10,
   },
   backButton: {
     position: 'absolute',
@@ -560,8 +872,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 8,
-    paddingBottom: 8,
+    gap: LOOK_GRID_GAP,
   },
   chatPanel: {
     position: 'absolute',
@@ -576,10 +887,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 26,
     overflow: 'hidden',
   },
+  // Área de arraste: a faixa inteira do topo do painel, não só a linha branca.
   dragHandle: {
-    height: 42,
+    height: DRAG_HANDLE_HEIGHT,
+    marginHorizontal: -26,
     alignItems: 'center',
     justifyContent: 'flex-start',
+    // Mesma altura da barra do armário na Home, para ela não "pular" na troca.
     paddingTop: 10,
   },
   dragIndicator: {
@@ -590,6 +904,8 @@ const styles = StyleSheet.create({
   },
   messagesContainer: {
     flex: 1,
+  },
+  messagesContent: {
     gap: 24,
   },
   zyraMessageRow: {
@@ -615,9 +931,12 @@ const styles = StyleSheet.create({
     borderRadius: 15,
   },
   zyraMessageText: {
+    // Sem flex, o texto longo passava da borda do painel em vez de quebrar a linha.
+    flex: 1,
     color: theme.colors.white,
     fontFamily: theme.fonts.semiBold,
     fontSize: 14,
+    lineHeight: 20,
   },
   userMessage: {
     alignSelf: 'flex-end',
@@ -635,8 +954,6 @@ const styles = StyleSheet.create({
   },
   chatContainer: {
     position: 'absolute',
-    left: 52,
-    right: 52,
     zIndex: 20,
     elevation: 20,
   },
@@ -655,23 +972,27 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   chatInput: {
-    height: 56,
+    minHeight: 56,
     borderRadius: 20,
     backgroundColor: theme.colors.white,
     paddingLeft: 18,
     paddingRight: 10,
+    paddingVertical: 8,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.12,
     shadowRadius: 8,
     elevation: 8,
   },
+  // Cresce com o texto até ~5 linhas; depois rola por dentro.
   textInput: {
     flex: 1,
-    height: 56,
-    paddingVertical: 0,
+    minHeight: 40,
+    maxHeight: 112,
+    paddingTop: 10,
+    paddingBottom: 10,
     color: theme.colors.titleZyra,
     fontFamily: theme.fonts.semiBold,
     fontSize: 14,
@@ -679,22 +1000,25 @@ const styles = StyleSheet.create({
   cameraButton: {
     width: 34,
     height: 34,
+    marginBottom: 3,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sendButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#2C2C2C',
+    width: 36,
+    height: 36,
+    marginBottom: 2,
+    borderRadius: 18,
+    shadowColor: '#AB003E',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  sendButtonGradient: {
+    flex: 1,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  sendButtonText: {
-    color: theme.colors.white,
-    fontFamily: theme.fonts.semiBold,
-    fontSize: 23,
-    lineHeight: 25,
-    marginTop: -2,
   },
 });

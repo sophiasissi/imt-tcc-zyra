@@ -1,4 +1,11 @@
-import { Image, StyleSheet, Text, View } from 'react-native';
+import {
+  Image,
+  StyleProp,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+} from 'react-native';
 
 import { CATEGORIA_LABEL, Peca } from '../services/pecasApi';
 import { theme } from '../styles/theme';
@@ -6,6 +13,8 @@ import { getColorAddSymbol } from '../utils/colorAddSymbols';
 
 type Props = {
   peca: Peca;
+  /** Tamanho do card. Sem ele, usa o tamanho da grade do armário na Home. */
+  style?: StyleProp<ViewStyle>;
 };
 
 /**
@@ -14,7 +23,7 @@ type Props = {
  * A cor nunca aparece só pela foto — sempre com o nome escrito e o símbolo,
  * para quem não distingue a tonalidade na imagem.
  */
-export function ClosetItemCard({ peca }: Props) {
+export function ClosetItemCard({ peca, style }: Props) {
   const symbol = getColorAddSymbol(peca.colorAddSymbol);
   const nomeCor = symbol?.label ?? peca.corNome;
   const categoria = CATEGORIA_LABEL[peca.categoria];
@@ -22,7 +31,7 @@ export function ClosetItemCard({ peca }: Props) {
 
   return (
     <View
-      style={styles.card}
+      style={[styles.card, style]}
       accessible
       accessibilityLabel={descricao || 'Peça do seu armário'}
     >
