@@ -32,14 +32,28 @@ const CADASTRO_STEPS = [
 ];
 
 export function CapturedClothingScreen({ navigation, route }: Props) {
-  const { photoUri, colorName, colorAddSymbol, hex } = route.params;
+  const {
+    photoUri,
+    colorName,
+    colorAddSymbol,
+    hex,
+    corSecundariaNome,
+    hexSecundario,
+    colorAddSymbolSecundario,
+  } = route.params;
   const { tokens } = useAuth();
 
   const [isCadastrando, setIsCadastrando] = useState(false);
   const [popup, setPopup] = useState<ZyraPopupConfig | null>(null);
 
   const symbol = getColorAddSymbol(colorAddSymbol);
-  const displayedColorName = symbol?.label ?? colorName ?? '';
+  const symbolSecundario = getColorAddSymbol(colorAddSymbolSecundario);
+  const nomePrincipal = symbol?.label ?? colorName ?? '';
+  const nomeSecundario = symbolSecundario?.label ?? corSecundariaNome ?? '';
+  const displayedColorName =
+    nomePrincipal && nomeSecundario
+      ? `${nomePrincipal} e ${nomeSecundario}`
+      : nomePrincipal;
 
   function handleGoBack() {
     navigation.goBack();
@@ -65,6 +79,9 @@ export function CapturedClothingScreen({ navigation, route }: Props) {
           corNome: colorName,
           hex,
           colorAddSymbol,
+          corSecundariaNome,
+          hexSecundario,
+          colorAddSymbolSecundario,
         },
         accessToken,
       );
@@ -125,13 +142,23 @@ export function CapturedClothingScreen({ navigation, route }: Props) {
           </TouchableOpacity>
 
           <View style={styles.colorHeader}>
-            {symbol ? (
-              <Image
-                source={symbol.image}
-                style={styles.colorSymbol}
-                tintColor="#FFFFFF"
-              />
-            ) : null}
+            <View style={styles.colorSymbolRow}>
+              {symbol ? (
+                <Image
+                  source={symbol.image}
+                  style={styles.colorSymbol}
+                  tintColor="#FFFFFF"
+                />
+              ) : null}
+
+              {symbolSecundario ? (
+                <Image
+                  source={symbolSecundario.image}
+                  style={styles.colorSymbol}
+                  tintColor="#FFFFFF"
+                />
+              ) : null}
+            </View>
 
             {displayedColorName ? (
               <Text style={styles.colorText}>{displayedColorName}</Text>
@@ -225,6 +252,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 110,
+  },
+  colorSymbolRow: {
+    flexDirection: 'row',
+    gap: 8,
   },
   colorSymbol: {
     width: 30,

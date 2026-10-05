@@ -126,6 +126,9 @@ export type RootStackParamList = {
     colorName?: string | null;
     colorAddSymbol?: string | null;
     hex?: string | null;
+    corSecundariaNome?: string | null;
+    hexSecundario?: string | null;
+    colorAddSymbolSecundario?: string | null;
   };
 };
 

@@ -16,7 +16,12 @@ type Props = {
  */
 export function ClosetItemCard({ peca }: Props) {
   const symbol = getColorAddSymbol(peca.colorAddSymbol);
-  const nomeCor = symbol?.label ?? peca.corNome;
+  const symbolSecundario = getColorAddSymbol(peca.colorAddSymbolSecundario);
+  const nomeSecundario = symbolSecundario?.label ?? peca.corSecundariaNome;
+  const nomePrincipal = symbol?.label ?? peca.corNome;
+  const nomeCor = nomeSecundario
+    ? `${nomePrincipal} e ${nomeSecundario}`
+    : nomePrincipal;
   const categoria = CATEGORIA_LABEL[peca.categoria];
   const descricao = [categoria, nomeCor].filter(Boolean).join(', ');
 
@@ -32,6 +37,10 @@ export function ClosetItemCard({ peca }: Props) {
         <View style={styles.colorTag}>
           {symbol ? (
             <Image source={symbol.image} style={styles.symbol} />
+          ) : null}
+
+          {symbolSecundario ? (
+            <Image source={symbolSecundario.image} style={styles.symbol} />
           ) : null}
 
           <Text style={styles.colorText} numberOfLines={1}>

@@ -16,10 +16,22 @@ if (!VISION_API_URL) {
   );
 }
 
-export type DetectColorResponse = {
+export type CorLida = {
   colorName: string;
   hex: string;
   colorAddSymbol: string;
+};
+
+/**
+ * - mira: só o ponto que a pessoa aponta (loop da câmera), sem cor secundária.
+ * - peca: a cor que mais ocupa a peça e a segunda cor de listras e estampas.
+ *   É a leitura do cadastro.
+ */
+export type AreaDeLeitura = 'mira' | 'peca';
+
+export type DetectColorResponse = CorLida & {
+  /** Segunda cor da peça; só vem com area=peca, e null em peça de uma cor. */
+  secondary?: (CorLida & { share?: number }) | null;
   /** Cor dominante lida, útil para depurar leituras estranhas. */
   rgb?: [number, number, number];
   /** Fração de pixels próximos da cor dominante, de 0 a 1. */
@@ -94,9 +106,10 @@ async function postImageFile<TResponse>(
 
 export async function detectColorFromImage(
   imageUri: string,
+  area: AreaDeLeitura = 'mira',
 ): Promise<DetectColorResponse> {
   return postImageFile<DetectColorResponse>(
-    '/detect-color',
+    `/detect-color?area=${area}`,
     imageUri,
     'camera-frame.jpg',
   );

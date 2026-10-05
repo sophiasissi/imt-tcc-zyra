@@ -5,47 +5,80 @@ import { apiRequest } from './api';
 // taxonomy.py da visão.
 export type Categoria =
   | 'CAMISETA'
+  | 'POLO'
+  | 'REGATA'
   | 'CAMISA'
   | 'MOLETOM'
+  | 'CARDIGA'
   | 'JAQUETA'
+  | 'CASACO'
   | 'BLAZER'
+  | 'COLETE'
   | 'CALCA'
   | 'SHORT'
   | 'SAIA'
   | 'VESTIDO'
+  | 'MACACAO'
   | 'TENIS'
-  | 'SAPATO';
+  | 'SAPATO'
+  | 'BOTA'
+  | 'SANDALIA';
 export type Estilo =
   | 'CASUAL'
+  | 'ESPORTE_FINO'
   | 'SOCIAL'
   | 'ESPORTIVO'
   | 'STREETWEAR'
   | 'ELEGANTE'
   | 'BASICO';
-export type Estampa = 'LISO' | 'ESTAMPADO' | 'LISTRADO' | 'XADREZ' | 'LOGO';
+export type Estampa =
+  | 'LISO'
+  | 'ESTAMPADO'
+  | 'LISTRADO'
+  | 'XADREZ'
+  | 'FLORAL'
+  | 'POA'
+  | 'ANIMAL_PRINT'
+  | 'LOGO';
 export type Ocasiao =
   | 'DIA_A_DIA'
   | 'TRABALHO'
   | 'FESTA'
+  | 'EVENTO_FORMAL'
   | 'ACADEMIA'
   | 'PRAIA'
   | 'CASA';
 export type Aquecimento = 'LEVE' | 'MEDIO' | 'QUENTE';
-export type Material = 'JEANS' | 'COURO';
+export type Material =
+  | 'JEANS'
+  | 'COURO'
+  | 'VERNIZ'
+  | 'CAMURCA'
+  | 'TRICO'
+  | 'PELO'
+  | 'PAETE';
 
 /** Nome da categoria como aparece para a pessoa (e para o leitor de tela). */
 export const CATEGORIA_LABEL: Record<Categoria, string> = {
   CAMISETA: 'camiseta',
+  POLO: 'polo',
+  REGATA: 'regata',
   CAMISA: 'camisa',
   MOLETOM: 'moletom',
+  CARDIGA: 'cardigã',
   JAQUETA: 'jaqueta',
+  CASACO: 'casaco',
   BLAZER: 'blazer',
+  COLETE: 'colete',
   CALCA: 'calça',
   SHORT: 'short',
   SAIA: 'saia',
   VESTIDO: 'vestido',
+  MACACAO: 'macacão',
   TENIS: 'tênis',
   SAPATO: 'sapato',
+  BOTA: 'bota',
+  SANDALIA: 'sandália',
 };
 
 /** Peça do closet como o back devolve (model `Peca` do Prisma). */
@@ -73,10 +106,14 @@ export type Peca = {
 
 export type CadastrarPecaInput = {
   photoUri: string;
-  /** Sem a cor completa, o back lê a cor da foto sozinho. */
+  /** Sem a cor completa, o back lê as cores da foto sozinho. */
   corNome?: string | null;
   hex?: string | null;
   colorAddSymbol?: string | null;
+  /** Só em peça de duas cores (listras, estampas). */
+  corSecundariaNome?: string | null;
+  hexSecundario?: string | null;
+  colorAddSymbolSecundario?: string | null;
 };
 
 export type AtualizarPecaInput = Partial<
@@ -112,6 +149,17 @@ export function cadastrarPeca(input: CadastrarPecaInput, token: string) {
   if (input.hex) formData.append('hex', input.hex);
   if (input.colorAddSymbol) {
     formData.append('colorAddSymbol', input.colorAddSymbol);
+  }
+
+  // A secundária só vai completa; o back ignora a incompleta.
+  if (
+    input.corSecundariaNome &&
+    input.hexSecundario &&
+    input.colorAddSymbolSecundario
+  ) {
+    formData.append('corSecundariaNome', input.corSecundariaNome);
+    formData.append('hexSecundario', input.hexSecundario);
+    formData.append('colorAddSymbolSecundario', input.colorAddSymbolSecundario);
   }
 
   return apiRequest<Peca>('/pecas', {

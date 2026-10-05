@@ -382,7 +382,7 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
       // do loop da câmera.
       const [validation, corDaFoto] = await Promise.all([
         validateClothingFromImage(capturedPhotoUri),
-        detectColorFromImage(capturedPhotoUri).catch(() => null),
+        detectColorFromImage(capturedPhotoUri, 'peca').catch(() => null),
       ]);
 
       if (!isScreenActiveRef.current) {
@@ -404,6 +404,8 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
 
       // A cor da foto capturada é mais confiável que a última leitura do
       // loop, que pode ser de um instante anterior com a mira em outro ponto.
+      // Ela é lida na peça inteira: numa camiseta cinza com estampa vermelha,
+      // a mira pode estar sobre a estampa.
       const colorName =
         corDaFoto?.colorName ??
         lastMappedResult?.label ??
@@ -419,6 +421,9 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
       const hex =
         corDaFoto?.hex ?? lastMappedResult?.raw.hex ?? result?.hex ?? null;
 
+      // Só a leitura da peça inteira enxerga a segunda cor.
+      const secundaria = corDaFoto?.secondary ?? null;
+
       setFrozenPhotoUri(null);
 
       navigation.navigate('CapturedClothing', {
@@ -426,6 +431,9 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
         colorName,
         colorAddSymbol,
         hex,
+        corSecundariaNome: secundaria?.colorName ?? null,
+        hexSecundario: secundaria?.hex ?? null,
+        colorAddSymbolSecundario: secundaria?.colorAddSymbol ?? null,
       });
     } catch (error) {
       setFrozenPhotoUri(null);
