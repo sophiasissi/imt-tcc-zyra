@@ -7,6 +7,7 @@
 import React from 'react';
 import {
   Animated,
+  BackHandler,
   Dimensions,
   Easing,
   Keyboard,
@@ -18,7 +19,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -26,16 +26,20 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
 
 import { ClosetItemCard } from '../components/ClosetItemCard';
+import { ZyraPopup } from '../components/ZyraPopup';
 import { useAuth } from '../contexts/AuthContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { ApiError } from '../services/api';
 import {
   MensagemHistorico,
   PecaDoLook,
+  salvarLook,
   sugerirLook,
 } from '../services/looksApi';
+import { Ocasiao } from '../services/pecasApi';
 import { theme } from '../styles/theme';
 import CameraSvg from '../../assets/icons/camera.svg';
+import ZyraAvatar from '../../assets/images/zyrabola.svg';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Chat'>;
 
@@ -65,7 +69,10 @@ const PECAS_RECENTES = 12;
 
 // Área das fotos do look: abaixo do cabeçalho e acima do chat recolhido.
 const HEADER_HEIGHT = 104;
-const LOOK_AREA_TOP = 160;
+// Barra do look (voltar + título): afastada do logo da Home e das fotos.
+const LOOK_HEADER_TOP = 14;
+const BACK_BUTTON_SIZE = 36;
+const LOOK_AREA_TOP = HEADER_HEIGHT + LOOK_HEADER_TOP + BACK_BUTTON_SIZE + 16;
 const LOOK_AREA_SIDE = 16;
 const LOOK_GRID_GAP = 10;
 
@@ -76,6 +83,32 @@ const EXPANDED_PANEL_TOP = 115;
 
 // Quantas mensagens anteriores vão junto, para o back entender respostas curtas.
 const MENSAGENS_DE_CONTEXTO = 6;
+
+// O back aceita nomes de look com até 60 caracteres.
+const TITULO_MAX = 60;
+
+/**
+ * Título do look na Galeria: primeira letra maiúscula e cortado no limite.
+ * Serve também para o título provisório (o próprio pedido da pessoa), usado
+ * enquanto o back não manda o `titulo` gerado pela IA.
+ */
+function formatarTitulo(texto: string) {
+  const limpo = texto.replace(/\s+/g, ' ').trim();
+  const cortado =
+    limpo.length > TITULO_MAX
+      ? `${limpo.slice(0, TITULO_MAX - 1).trimEnd()}…`
+      : limpo;
+
+  return cortado.charAt(0).toUpperCase() + cortado.slice(1);
+}
+
+type DialogoSalvar =
+  | { tipo: 'pergunta' }
+  /**
+   * podeTentarDeNovo: false quando repetir não adianta (404: uma peça do look
+   * foi excluída enquanto o chat estava aberto). Aí só resta sair.
+   */
+  | { tipo: 'erro'; mensagem: string; podeTentarDeNovo: boolean };
 
 const ERRO_PADRAO =
   'Não consegui montar o look agora. Tente de novo em instantes.';
@@ -117,6 +150,9 @@ export function ChatScreen({ navigation, route }: Props) {
   const isKeyboardVisible = React.useRef(false);
   const isClosing = React.useRef(false);
   const isMounted = React.useRef(true);
+  // Título e ocasião do look na tela, guardados para o momento de salvar.
+  const lookTitulo = React.useRef<string | null>(null);
+  const lookOcasiao = React.useRef<Ocasiao | null>(null);
 
   const { tokens } = useAuth();
   const accessToken = tokens?.accessToken ?? null;
@@ -125,9 +161,15 @@ export function ChatScreen({ navigation, route }: Props) {
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [isLookReady, setIsLookReady] = React.useState(false);
   const [lookPecas, setLookPecas] = React.useState<PecaDoLook[]>([]);
+  const [dialogoSalvar, setDialogoSalvar] =
+    React.useState<DialogoSalvar | null>(null);
+  const [isSalvando, setIsSalvando] = React.useState(false);
   const [isPanelExpanded, setIsPanelExpanded] = React.useState(true);
   // O campo de texto cresce com o texto; a lista de mensagens abre espaço para ele.
   const [inputHeight, setInputHeight] = React.useState(56);
+  // Com o teclado aberto, a conversa ganha esse espaço a mais no fim, para
+  // as últimas mensagens subirem junto com a caixa de texto.
+  const [keyboardHeight, setKeyboardHeight] = React.useState(0);
   // A conversa só rola quando não cabe na tela. Rolagem ligada à toa faz o
   // iPhone tomar o gesto para si, e o painel não recolhe nem abre.
   const [isConversationScrollable, setIsConversationScrollable] =
@@ -153,6 +195,7 @@ export function ChatScreen({ navigation, route }: Props) {
   React.useEffect(() => {
     function moveInputAboveKeyboard(event: KeyboardEvent) {
       isKeyboardVisible.current = true;
+      setKeyboardHeight(event.endCoordinates.height);
       Animated.timing(inputBottom, {
         toValue: event.endCoordinates.height + 16,
         duration: event.duration || 250,
@@ -163,6 +206,7 @@ export function ChatScreen({ navigation, route }: Props) {
 
     function resetInputPosition(event?: KeyboardEvent) {
       isKeyboardVisible.current = false;
+      setKeyboardHeight(0);
       Animated.timing(inputBottom, {
         toValue: 30,
         duration: event?.duration || 250,
@@ -307,7 +351,101 @@ export function ChatScreen({ navigation, route }: Props) {
     });
   }
 
-  function returnToHome() {
+  /**
+   * Seta de voltar (e botão voltar do Android). Com um look na tela, pergunta
+   * antes se a pessoa quer guardá-lo na Galeria de Looks; sem look, só sai.
+   */
+  function handleVoltar() {
+    if (isClosing.current) {
+      return;
+    }
+
+    if (isLookReadyRef.current && lookPecas.length > 0) {
+      Keyboard.dismiss();
+      setDialogoSalvar({ tipo: 'pergunta' });
+      return;
+    }
+
+    returnToHome();
+  }
+
+  async function handleSalvarLook() {
+    if (!accessToken || isSalvando) {
+      return;
+    }
+
+    setIsSalvando(true);
+
+    try {
+      await salvarLook(
+        {
+          pecaIds: lookPecas.map((peca) => peca.id),
+          nome: lookTitulo.current ?? undefined,
+          ocasiao: lookOcasiao.current ?? undefined,
+        },
+        accessToken,
+      );
+
+      if (!isMounted.current) {
+        return;
+      }
+
+      setDialogoSalvar(null);
+      returnToHome({ lookSalvo: true });
+    } catch (error) {
+      console.error('[Chat] Falha ao salvar o look:', error);
+
+      if (isMounted.current) {
+        // Sem sair da tela: a pessoa decide entre tentar de novo e sair sem
+        // salvar, em vez de perder o look sem perceber.
+        const pecaSumiu = error instanceof ApiError && error.isNotFound;
+
+        setDialogoSalvar({
+          tipo: 'erro',
+          mensagem:
+            error instanceof ApiError
+              ? error.message
+              : 'Não foi possível salvar o look agora.',
+          podeTentarDeNovo: !pecaSumiu,
+        });
+      }
+    } finally {
+      if (isMounted.current) {
+        setIsSalvando(false);
+      }
+    }
+  }
+
+  function handleNaoSalvar() {
+    setDialogoSalvar(null);
+    returnToHome();
+  }
+
+  // Lida pelo BackHandler, registrado uma vez só: aponta sempre para a versão
+  // atual, que enxerga as peças do look na tela.
+  const handleVoltarRef = React.useRef(handleVoltar);
+  handleVoltarRef.current = handleVoltar;
+
+  React.useEffect(() => {
+    // Sem isto, o voltar do Android fechava o chat direto, sem animação e
+    // sem oferecer salvar o look.
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        // Com a câmera aberta por cima do chat, o voltar é dela.
+        if (!navigation.isFocused()) {
+          return false;
+        }
+
+        handleVoltarRef.current();
+        return true;
+      },
+    );
+
+    return () => subscription.remove();
+  }, [navigation]);
+
+  function returnToHome({ lookSalvo = false } = {}) {
     if (isClosing.current) {
       return;
     }
@@ -341,7 +479,12 @@ export function ChatScreen({ navigation, route }: Props) {
       }),
     ]).start(({ finished }) => {
       if (finished) {
-        navigation.goBack();
+        if (lookSalvo) {
+          // A Home mostra o aviso de "look salvo" ao receber este parâmetro.
+          navigation.popTo('Home', { lookSalvoEm: Date.now() });
+        } else {
+          navigation.goBack();
+        }
         return;
       }
 
@@ -590,6 +733,16 @@ export function ChatScreen({ navigation, route }: Props) {
       );
 
       if (resposta.tipo === 'LOOK') {
+        // Sem título da IA, um pedido de ajuste ("quero outro", "troca a
+        // calça") mantém o título do look que ele modificou.
+        const tituloDaIa = resposta.titulo?.trim();
+
+        lookTitulo.current = tituloDaIa
+          ? formatarTitulo(tituloDaIa)
+          : ((lookPecas.length > 0 ? lookTitulo.current : null) ??
+            formatarTitulo(normalizedText));
+        lookOcasiao.current = resposta.ocasiao ?? null;
+
         recentPecaIds.current = [
           ...recentPecaIds.current,
           ...resposta.pecas.map((peca) => peca.id),
@@ -614,209 +767,280 @@ export function ChatScreen({ navigation, route }: Props) {
     }
   }
 
+  // Sem um Touchable em volta da tela para fechar o teclado: ele virava o
+  // responsável por todo toque, e no iOS a lista de mensagens não rola
+  // enquanto um elemento acima dela é o responsável. Tocar na conversa já
+  // fecha o teclado (keyboardShouldPersistTaps="handled"); na área do look,
+  // o onTouchStart faz o mesmo sem disputar o toque.
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <View style={styles.screen}>
-        {isLookReady ? (
-          <Animated.View
-            style={[styles.lookResultLayer, { opacity: resultOpacity }]}
-          >
+    <View style={styles.screen}>
+      {isLookReady ? (
+        <Animated.View
+          style={[styles.lookResultLayer, { opacity: resultOpacity }]}
+          onTouchStart={Keyboard.dismiss}
+        >
+          <View style={styles.lookHeader}>
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel="Voltar para o armário digital"
+              accessibilityLabel="Voltar para a tela inicial"
               activeOpacity={0.82}
+              // Bolinha de 36 px; com a folga, o toque continua com 44 px.
+              hitSlop={4}
               style={styles.backButton}
-              onPress={returnToHome}
+              onPress={handleVoltar}
             >
-              <Text style={styles.backButtonIcon}>←</Text>
+              {/* Desenhada aqui, com a caixa da seta centrada no viewBox: o
+                    SVG baixado tinha margens irregulares e ficava torto. */}
+              <Svg width={18} height={18} viewBox="0 0 24 24">
+                <Path
+                  d="M15.5 5l-7 7 7 7"
+                  stroke={theme.colors.white}
+                  strokeWidth={2.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              </Svg>
             </TouchableOpacity>
 
-            <ScrollView
-              style={styles.lookScroll}
-              contentContainerStyle={styles.lookGrid}
-              accessibilityLabel="Peças do look sugerido"
-            >
-              {lookPecas.map((peca) => (
-                <ClosetItemCard
-                  key={peca.id}
-                  peca={peca}
-                  style={lookCardSize}
-                />
-              ))}
-            </ScrollView>
-          </Animated.View>
-        ) : null}
+            <Text style={styles.lookHeaderTitle} accessibilityRole="header">
+              Seu look
+            </Text>
+          </View>
+
+          <ScrollView
+            style={styles.lookScroll}
+            contentContainerStyle={styles.lookGrid}
+            accessibilityLabel="Peças do look sugerido"
+          >
+            {lookPecas.map((peca) => (
+              <ClosetItemCard key={peca.id} peca={peca} style={lookCardSize} />
+            ))}
+          </ScrollView>
+        </Animated.View>
+      ) : null}
+
+      <Animated.View
+        style={[
+          styles.chatPanel,
+          {
+            height: expandedPanelHeight,
+            transform: [{ translateY: panelTranslateY }],
+          },
+        ]}
+        {...panelBodyPanResponder.panHandlers}
+      >
+        <View
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel={
+            isLookReady
+              ? 'Abrir ou recolher a conversa'
+              : 'Fechar conversa e voltar para a tela inicial'
+          }
+          accessibilityHint="Toque ou arraste para baixo"
+          style={styles.dragHandle}
+          {...panelPanResponder.panHandlers}
+        >
+          <View style={styles.dragIndicator} />
+        </View>
 
         <Animated.View
           style={[
-            styles.chatPanel,
-            {
-              height: expandedPanelHeight,
-              transform: [{ translateY: panelTranslateY }],
+            styles.messagesContainer,
+            // Recolhido, só o topo do painel aparece: a lista cabe entre a
+            // barra de arraste e o campo de texto.
+            !isPanelExpanded && {
+              flex: 0,
+              height:
+                COLLAPSED_PANEL_HEIGHT -
+                DRAG_HANDLE_HEIGHT -
+                inputHeight -
+                INPUT_BOTTOM_GAP,
             },
+            { opacity: conversationOpacity },
           ]}
-          {...panelBodyPanResponder.panHandlers}
         >
-          <View
-            accessible
-            accessibilityRole="button"
-            accessibilityLabel={
-              isLookReady
-                ? 'Abrir ou recolher a conversa'
-                : 'Fechar conversa e voltar para a tela inicial'
-            }
-            accessibilityHint="Toque ou arraste para baixo"
-            style={styles.dragHandle}
-            {...panelPanResponder.panHandlers}
-          >
-            <View style={styles.dragIndicator} />
-          </View>
-
-          <Animated.View
-            style={[
-              styles.messagesContainer,
-              // Recolhido, só o topo do painel aparece: a lista cabe entre a
-              // barra de arraste e o campo de texto.
-              !isPanelExpanded && {
-                flex: 0,
-                height:
-                  COLLAPSED_PANEL_HEIGHT -
-                  DRAG_HANDLE_HEIGHT -
-                  inputHeight -
-                  INPUT_BOTTOM_GAP,
+          <ScrollView
+            ref={messagesScrollRef}
+            contentContainerStyle={[
+              styles.messagesContent,
+              {
+                // A caixa de texto sobe de 30 px do fundo para o teclado +
+                // 16; a diferença entra aqui para nada ficar escondido.
+                paddingBottom: isPanelExpanded
+                  ? inputHeight +
+                    INPUT_BOTTOM_GAP +
+                    20 +
+                    Math.max(keyboardHeight - 14, 0)
+                  : 8,
               },
-              { opacity: conversationOpacity },
             ]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            scrollEventThrottle={16}
+            onScroll={(event) => {
+              messagesScrollY.current = event.nativeEvent.contentOffset.y;
+            }}
+            scrollEnabled={isConversationScrollable}
+            bounces={false}
+            onLayout={(event) => {
+              messagesViewportHeight.current = event.nativeEvent.layout.height;
+              atualizarRolagemDaConversa();
+            }}
+            onContentSizeChange={(_, altura) => {
+              messagesContentHeight.current = altura;
+              messagesScrollRef.current?.scrollToEnd({ animated: true });
+              atualizarRolagemDaConversa();
+            }}
           >
-            <ScrollView
-              ref={messagesScrollRef}
-              contentContainerStyle={[
-                styles.messagesContent,
-                {
-                  paddingBottom: isPanelExpanded
-                    ? inputHeight + INPUT_BOTTOM_GAP + 20
-                    : 8,
-                },
-              ]}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              scrollEventThrottle={16}
-              onScroll={(event) => {
-                messagesScrollY.current = event.nativeEvent.contentOffset.y;
-              }}
-              scrollEnabled={isConversationScrollable}
-              bounces={false}
-              onLayout={(event) => {
-                messagesViewportHeight.current =
-                  event.nativeEvent.layout.height;
-                atualizarRolagemDaConversa();
-              }}
-              onContentSizeChange={(_, altura) => {
-                messagesContentHeight.current = altura;
-                messagesScrollRef.current?.scrollToEnd({ animated: true });
-                atualizarRolagemDaConversa();
-              }}
-            >
-              {messages.map((message) =>
-                message.author === 'zyra' ? (
-                  <View key={message.id} style={styles.zyraMessageRow}>
-                    <View style={styles.messageIndicatorShadow}>
-                      <LinearGradient
-                        colors={['#DE0051', '#AB003E', '#78002C']}
-                        locations={[0.3, 0.67, 1]}
-                        start={{ x: 1, y: 0 }}
-                        end={{ x: 0, y: 1 }}
-                        style={styles.messageIndicator}
-                      />
-                    </View>
-
-                    <Text style={styles.zyraMessageText}>{message.text}</Text>
+            {messages.map((message) =>
+              message.author === 'zyra' ? (
+                <View key={message.id} style={styles.zyraMessageRow}>
+                  {/* Oval do ZYRA: a borda branca do degradê destaca o avatar
+                      no painel escuro (o vinho sozinho, ~1,9:1, quase sumia). */}
+                  <View
+                    style={styles.zyraAvatar}
+                    accessibilityElementsHidden
+                    importantForAccessibility="no-hide-descendants"
+                  >
+                    {/* Proporção do SVG (146 × 190). */}
+                    <ZyraAvatar width={31} height={40} />
                   </View>
-                ) : (
-                  <View key={message.id} style={styles.userMessage}>
-                    <Text style={styles.userMessageText}>{message.text}</Text>
-                  </View>
-                ),
-              )}
-            </ScrollView>
-          </Animated.View>
-        </Animated.View>
 
-        <Animated.View
-          style={[
-            styles.chatContainer,
-            { bottom: inputBottom, left: inputInset, right: inputInset },
-          ]}
-          onLayout={(event) => setInputHeight(event.nativeEvent.layout.height)}
-        >
-          <View pointerEvents="none" style={styles.chatInputGlow} />
-
-          <View style={styles.chatInput}>
-            <TextInput
-              ref={inputRef}
-              accessibilityLabel="Mensagem para o ZYRA"
-              placeholder="Fale com o ZYRA..."
-              placeholderTextColor={theme.colors.titleZyra}
-              style={styles.textInput}
-              value={inputText}
-              onChangeText={setInputText}
-              multiline
-              // Enter envia; o texto longo quebra a linha sozinho.
-              submitBehavior="submit"
-              returnKeyType="send"
-              onSubmitEditing={handleSend}
-              onFocus={() => {
-                if (isLookReadyRef.current && !expandedState.current) {
-                  openChatPanel();
-                }
-              }}
-              editable={!isGenerating}
-              maxLength={250}
-            />
-
-            {inputText.trim().length > 0 && !isGenerating ? (
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel="Enviar mensagem"
-                activeOpacity={0.8}
-                style={styles.sendButton}
-                onPress={handleSend}
-              >
-                <LinearGradient
-                  colors={['#DE0051', '#AB003E', '#78002C']}
-                  locations={[0.3, 0.67, 1]}
-                  start={{ x: 1, y: 0 }}
-                  end={{ x: 0, y: 1 }}
-                  style={styles.sendButtonGradient}
-                >
-                  <Svg width={18} height={18} viewBox="0 0 24 24">
-                    <Path
-                      d="M12 19V5M5 12l7-7 7 7"
-                      stroke="#FFFFFF"
-                      strokeWidth={2.6}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
-                  </Svg>
-                </LinearGradient>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel="Abrir câmera"
-                activeOpacity={0.8}
-                style={styles.cameraButton}
-                onPress={handleCamera}
-                disabled={isGenerating}
-              >
-                <CameraSvg width={24} height={24} />
-              </TouchableOpacity>
+                  <Text style={styles.zyraMessageText}>{message.text}</Text>
+                </View>
+              ) : (
+                <View key={message.id} style={styles.userMessage}>
+                  <Text style={styles.userMessageText}>{message.text}</Text>
+                </View>
+              ),
             )}
-          </View>
+          </ScrollView>
         </Animated.View>
-      </View>
-    </TouchableWithoutFeedback>
+      </Animated.View>
+
+      <Animated.View
+        style={[
+          styles.chatContainer,
+          { bottom: inputBottom, left: inputInset, right: inputInset },
+        ]}
+        onLayout={(event) => setInputHeight(event.nativeEvent.layout.height)}
+      >
+        <View pointerEvents="none" style={styles.chatInputGlow} />
+
+        <View style={styles.chatInput}>
+          <TextInput
+            ref={inputRef}
+            accessibilityLabel="Mensagem para o ZYRA"
+            placeholder="Fale com o ZYRA..."
+            placeholderTextColor={theme.colors.titleZyra}
+            style={styles.textInput}
+            value={inputText}
+            onChangeText={setInputText}
+            multiline
+            // Enter envia; o texto longo quebra a linha sozinho.
+            submitBehavior="submit"
+            returnKeyType="send"
+            onSubmitEditing={handleSend}
+            onFocus={() => {
+              if (isLookReadyRef.current && !expandedState.current) {
+                openChatPanel();
+              }
+            }}
+            editable={!isGenerating}
+            maxLength={250}
+          />
+
+          {inputText.trim().length > 0 && !isGenerating ? (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Enviar mensagem"
+              activeOpacity={0.8}
+              style={styles.sendButton}
+              onPress={handleSend}
+            >
+              <LinearGradient
+                colors={['#DE0051', '#AB003E', '#78002C']}
+                locations={[0.3, 0.67, 1]}
+                start={{ x: 1, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={styles.sendButtonGradient}
+              >
+                <Svg width={18} height={18} viewBox="0 0 24 24">
+                  <Path
+                    d="M12 19V5M5 12l7-7 7 7"
+                    stroke="#FFFFFF"
+                    strokeWidth={2.6}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                </Svg>
+              </LinearGradient>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Abrir câmera"
+              activeOpacity={0.8}
+              style={styles.cameraButton}
+              onPress={handleCamera}
+              disabled={isGenerating}
+            >
+              {/* O SVG tem ~25% de margem em volta do desenho: em 27 px a câmera
+                  aparece com ~20 px. Mesmo tamanho na Home e no chat, que trocam
+                  de lugar na transição. */}
+              <CameraSvg width={27} height={27} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </Animated.View>
+
+      {/* Um popup só, que troca de conteúdo: no iOS, um Modal abrindo
+            enquanto outro fecha às vezes não aparece. */}
+      <ZyraPopup
+        visible={Boolean(dialogoSalvar)}
+        variant={dialogoSalvar?.tipo === 'erro' ? 'error' : 'info'}
+        title={
+          dialogoSalvar?.tipo === 'erro'
+            ? 'Não foi possível salvar'
+            : 'Salvar este look?'
+        }
+        message={
+          dialogoSalvar?.tipo === 'erro'
+            ? dialogoSalvar.mensagem
+            : 'Deseja guardar este look na sua Galeria de Looks?'
+        }
+        buttonText={
+          isSalvando
+            ? 'Salvando...'
+            : dialogoSalvar?.tipo === 'erro'
+              ? dialogoSalvar.podeTentarDeNovo
+                ? 'Tentar de novo'
+                : 'Voltar para o início'
+              : 'Sim'
+        }
+        confirmDisabled={isSalvando}
+        onConfirm={
+          dialogoSalvar?.tipo === 'erro' && !dialogoSalvar.podeTentarDeNovo
+            ? handleNaoSalvar
+            : handleSalvarLook
+        }
+        secondaryButtonText={
+          dialogoSalvar?.tipo === 'erro'
+            ? dialogoSalvar.podeTentarDeNovo
+              ? 'Sair sem salvar'
+              : undefined
+            : 'Não'
+        }
+        onSecondary={handleNaoSalvar}
+        // Voltar do Android com o popup aberto: fica no look, sem decidir.
+        onClose={() => {
+          if (!isSalvando) setDialogoSalvar(null);
+        }}
+      />
+    </View>
   );
 }
 
@@ -842,28 +1066,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: LOOK_AREA_SIDE,
     paddingBottom: COLLAPSED_PANEL_HEIGHT + 10,
   },
-  backButton: {
+  // Barra do look: voltar e título lado a lado, numa faixa própria entre o
+  // logo da Home e as fotos.
+  lookHeader: {
     position: 'absolute',
-    top: 12,
-    left: 20,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: theme.colors.white,
+    top: LOOK_HEADER_TOP,
+    left: LOOK_AREA_SIDE + 4,
+    right: LOOK_AREA_SIDE + 4,
+    height: BACK_BUTTON_SIZE,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    zIndex: 3,
+  },
+  // Vinho sobre o fundo claro, com seta branca: contraste alto (a anterior,
+  // branca sobre creme, quase sumia).
+  backButton: {
+    width: BACK_BUTTON_SIZE,
+    height: BACK_BUTTON_SIZE,
+    borderRadius: BACK_BUTTON_SIZE / 2,
+    backgroundColor: theme.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.22,
     shadowRadius: 5,
-    elevation: 3,
-    zIndex: 3,
+    elevation: 4,
   },
-  backButtonIcon: {
-    color: theme.colors.titleZyra,
-    fontSize: 22,
-    lineHeight: 24,
-    fontFamily: theme.fonts.semiBold,
+  lookHeaderTitle: {
+    color: theme.colors.title,
+    fontFamily: theme.fonts.bold,
+    fontSize: 20,
   },
   lookScroll: {
     width: '100%',
@@ -913,22 +1147,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  messageIndicatorShadow: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    shadowColor: '#000000',
-    shadowOffset: { width: 1, height: 1 },
-    shadowOpacity: 0.28,
-    shadowRadius: 2,
-    elevation: 2,
+  zyraAvatar: {
+    width: 32,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  messageIndicator: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
   },
   zyraMessageText: {
     // Sem flex, o texto longo passava da borda do painel em vez de quebrar a linha.
@@ -998,9 +1220,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   cameraButton: {
-    width: 34,
-    height: 34,
-    marginBottom: 3,
+    width: 36,
+    height: 36,
+    marginBottom: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
