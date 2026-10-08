@@ -27,6 +27,7 @@ import { CameraColorDetectionScreen } from '../screens/CameraColorDetectionScree
 import { CapturedClothingScreen } from '../screens/CapturedClothingScreen';
 import { LookDetalheScreen } from '../screens/LookDetalheScreen';
 import { LookSalvo } from '../services/looksApi';
+import { TipoDeImagem } from '../utils/photoUpload';
 
 export type GeneroCadastro =
   | 'MASCULINO'
@@ -136,6 +137,8 @@ export type RootStackParamList = {
 
   CapturedClothing: {
     photoUri: string;
+    /** Foto da galeria pode ser PNG ou WebP; da câmera, sempre JPEG. */
+    photoTipo?: TipoDeImagem;
     colorName?: string | null;
     colorAddSymbol?: string | null;
     hex?: string | null;

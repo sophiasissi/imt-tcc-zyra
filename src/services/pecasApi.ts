@@ -1,4 +1,4 @@
-import { photoFormDataPart } from '../utils/photoUpload';
+import { photoFormDataPart, TipoDeImagem } from '../utils/photoUpload';
 import { apiRequest } from './api';
 
 // Códigos da taxonomia de peças: os mesmos dos enums do Prisma no back e do
@@ -75,6 +75,8 @@ export type Peca = {
 
 export type CadastrarPecaInput = {
   photoUri: string;
+  /** Tipo da imagem da galeria; sem ele, JPEG (o que a câmera grava). */
+  photoTipo?: TipoDeImagem;
   /** Sem a cor completa, o back lê a cor da foto sozinho. */
   corNome?: string | null;
   hex?: string | null;
@@ -107,7 +109,10 @@ export type AtualizarPecaInput = Partial<
 export function cadastrarPeca(input: CadastrarPecaInput, token: string) {
   const formData = new FormData();
 
-  formData.append('foto', photoFormDataPart(input.photoUri, 'roupa.jpg'));
+  formData.append(
+    'foto',
+    photoFormDataPart(input.photoUri, 'roupa', input.photoTipo),
+  );
 
   // Campo vazio não vai: o back valida o hex e recusaria string vazia.
   if (input.corNome) formData.append('corNome', input.corNome);
