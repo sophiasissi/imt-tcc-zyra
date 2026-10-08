@@ -53,10 +53,10 @@ async function carregarPerfil(accessToken: string) {
   });
 }
 
-export function LoginScreen({ navigation }: Props) {
+export function LoginScreen({ navigation, route }: Props) {
   const { signIn } = useAuth();
 
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(route.params?.email ?? '');
   const [senha, setSenha] = useState('');
   const [showSenha, setShowSenha] = useState(false);
   const [emailTouched, setEmailTouched] = useState(false);

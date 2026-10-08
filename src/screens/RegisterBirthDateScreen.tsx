@@ -72,6 +72,7 @@ export function RegisterBirthDateScreen({ navigation }: Props) {
 
   return (
     <AuthLayout
+      contentStyle={styles.centralizado}
       title=""
       onBack={() => navigation.goBack()}
       footer={
@@ -157,8 +158,11 @@ export function RegisterBirthDateScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  // Pergunta no centro da área entre o topo e o botão, em qualquer celular.
+  centralizado: {
+    justifyContent: 'center',
+  },
   question: {
-    marginTop: 200,
     color: theme.colors.titleZyra,
     fontFamily: theme.fonts.semiBold,
     fontSize: 20,

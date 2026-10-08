@@ -860,7 +860,8 @@ export function HomeScreen({ navigation, route }: Props) {
         confirmDisabled={isExcluindo}
         onConfirm={handleExcluir}
         secondaryButtonText="Cancelar"
-        onSecondary={() => setDialogoExclusao(null)}
+        onSecondaryPress={() => setDialogoExclusao(null)}
+        secondaryVariant="botao"
         onClose={() => {
           if (!isExcluindo) setDialogoExclusao(null);
         }}

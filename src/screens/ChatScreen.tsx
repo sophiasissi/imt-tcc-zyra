@@ -1034,7 +1034,8 @@ export function ChatScreen({ navigation, route }: Props) {
               : undefined
             : 'Não'
         }
-        onSecondary={handleNaoSalvar}
+        onSecondaryPress={handleNaoSalvar}
+        secondaryVariant="botao"
         // Voltar do Android com o popup aberto: fica no look, sem decidir.
         onClose={() => {
           if (!isSalvando) setDialogoSalvar(null);

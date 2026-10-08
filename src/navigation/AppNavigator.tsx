@@ -95,7 +95,8 @@ export type RootStackParamList = {
     tipoDaltonismo?: TipoDaltonismoCadastro;
   };
 
-  Login: undefined;
+  // email: vem preenchido quando o cadastro descobre que o email já tem conta.
+  Login: { email?: string } | undefined;
 
   ForgotPasswordEmail: undefined;
 

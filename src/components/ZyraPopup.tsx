@@ -14,9 +14,17 @@ export type ZyraPopupConfig = {
   showCloseButton?: boolean;
   customIcon?: React.ReactNode;
   onConfirm?: () => void;
-  /** Segundo botão, para perguntas de duas respostas (ex.: Sim e Não). */
+  /** Segunda ação do popup. */
   secondaryButtonText?: string;
-  onSecondary?: () => void;
+  onSecondaryPress?: () => void;
+  /**
+   * Como a segunda ação aparece:
+   * - 'link' (padrão): texto sublinhado abaixo do botão, para uma saída
+   *   alternativa (ex.: "Voltar" no aviso de email já cadastrado);
+   * - 'botao': botão contornado do mesmo tamanho, para escolher entre duas
+   *   respostas de peso parecido (ex.: Sim e Não, Excluir e Cancelar).
+   */
+  secondaryVariant?: 'link' | 'botao';
   /** Trava o botão principal enquanto a ação dele roda. */
   confirmDisabled?: boolean;
 };
@@ -71,7 +79,8 @@ export function ZyraPopup({
   onConfirm,
   onClose,
   secondaryButtonText,
-  onSecondary,
+  onSecondaryPress,
+  secondaryVariant = 'link',
   confirmDisabled = false,
   modal = true,
 }: Props) {
@@ -138,19 +147,28 @@ export function ZyraPopup({
           style={styles.actionButton}
         />
 
-        {secondaryButtonText && onSecondary ? (
+        {secondaryButtonText && onSecondaryPress ? (
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel={secondaryButtonText}
             activeOpacity={0.75}
+            hitSlop={secondaryVariant === 'link' ? 8 : undefined}
             disabled={confirmDisabled}
             style={[
-              styles.secondaryButton,
-              confirmDisabled && styles.secondaryButtonDisabled,
+              secondaryVariant === 'link'
+                ? styles.secondaryLink
+                : styles.secondaryButton,
+              confirmDisabled && styles.secondaryDisabled,
             ]}
-            onPress={onSecondary}
+            onPress={onSecondaryPress}
           >
-            <Text style={styles.secondaryButtonText}>
+            <Text
+              style={
+                secondaryVariant === 'link'
+                  ? styles.secondaryLinkText
+                  : styles.secondaryButtonText
+              }
+            >
               {secondaryButtonText}
             </Text>
           </TouchableOpacity>
@@ -243,6 +261,16 @@ const styles = StyleSheet.create({
   actionButton: {
     height: 50,
   },
+  secondaryLink: {
+    marginTop: 16,
+    paddingVertical: 4,
+  },
+  secondaryLinkText: {
+    color: theme.colors.link,
+    fontFamily: theme.fonts.semiBold,
+    fontSize: 15,
+    textDecorationLine: 'underline',
+  },
   // Contornado, para a resposta principal continuar sendo a mais visível.
   secondaryButton: {
     width: '100%',
@@ -254,7 +282,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryButtonDisabled: {
+  secondaryDisabled: {
     opacity: 0.55,
   },
   secondaryButtonText: {

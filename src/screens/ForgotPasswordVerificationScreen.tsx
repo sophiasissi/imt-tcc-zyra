@@ -99,8 +99,10 @@ export function ForgotPasswordVerificationScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
+  // No centro da área livre: quando o teclado abre, a área encolhe e os
+  // campos sobem junto com ele.
   content: {
-    paddingTop: 150,
+    justifyContent: 'center',
   },
   heading: {
     color: theme.colors.label,

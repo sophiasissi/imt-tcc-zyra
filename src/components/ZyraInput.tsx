@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { type ReactNode, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 
 import { theme } from '../styles/theme';
+import { useAvisarCampoFocado } from './AuthLayout';
 
 type Props = TextInputProps & {
   label: string;
@@ -20,10 +21,14 @@ export function ZyraInput({
   error,
   rightAccessory,
   style,
+  onFocus,
   ...props
 }: Props) {
+  const wrapperRef = useRef<View>(null);
+  const avisarCampoFocado = useAvisarCampoFocado();
+
   return (
-    <View style={styles.wrapper}>
+    <View ref={wrapperRef} style={styles.wrapper}>
       <Text style={styles.label}>{label}</Text>
       <View style={styles.inputContainer}>
         <TextInput
@@ -35,6 +40,11 @@ export function ZyraInput({
             style,
           ]}
           {...props}
+          onFocus={(event) => {
+            // O campo inteiro (rótulo, caixa e erro) fica visível acima do teclado.
+            avisarCampoFocado(wrapperRef.current);
+            onFocus?.(event);
+          }}
         />
         {rightAccessory ? (
           <View style={styles.rightAccessory}>{rightAccessory}</View>
