@@ -25,6 +25,9 @@ import { SplashScreen } from '../screens/SplashScreen';
 import { useAuth } from '../contexts/AuthContext';
 import { CameraColorDetectionScreen } from '../screens/CameraColorDetectionScreen';
 import { CapturedClothingScreen } from '../screens/CapturedClothingScreen';
+import { LookDetalheScreen } from '../screens/LookDetalheScreen';
+import { LookSalvo } from '../services/looksApi';
+import { TipoDeImagem } from '../utils/photoUpload';
 
 export type GeneroCadastro =
   | 'MASCULINO'
@@ -106,7 +109,12 @@ export type RootStackParamList = {
     confirmationCode: string;
   };
 
-  Home: undefined;
+  Home:
+    | {
+        /** Instante em que o chat salvou um look: a Home mostra o aviso. */
+        lookSalvoEm?: number;
+      }
+    | undefined;
 
   Chat: {
     nome?: string | null;
@@ -124,8 +132,14 @@ export type RootStackParamList = {
 
   CameraColorDetection: undefined;
 
+  LookDetalhe: {
+    look: LookSalvo;
+  };
+
   CapturedClothing: {
     photoUri: string;
+    /** Foto da galeria pode ser PNG ou WebP; da câmera, sempre JPEG. */
+    photoTipo?: TipoDeImagem;
     colorName?: string | null;
     colorAddSymbol?: string | null;
     hex?: string | null;
@@ -226,6 +240,8 @@ export function AppNavigator() {
             gestureEnabled: false,
           }}
         />
+
+        <Stack.Screen name="LookDetalhe" component={LookDetalheScreen} />
 
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />

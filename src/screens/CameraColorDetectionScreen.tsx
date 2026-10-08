@@ -2,14 +2,19 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Image,
   ImageSourcePropType,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import {
@@ -19,6 +24,7 @@ import {
   ValidateClothingResponse,
 } from '../services/visionApi';
 import { getColorAddSymbol } from '../utils/colorAddSymbols';
+import { TipoDeImagem, tipoDeImagemAceito } from '../utils/photoUpload';
 import { theme } from '../styles/theme';
 import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
 import { ZyraLoadingPopup } from '../components/ZyraLoadingPopup';
@@ -42,6 +48,36 @@ type MappedColorResult = {
   image: ImageSourcePropType;
   raw: DetectColorResponse;
 };
+
+type Lente = '1x' | '0.5x';
+
+// Faixas escuras de cima (resultado da cor) e de baixo (botões).
+const TOP_AREA_HEIGHT = 148;
+const BOTTOM_AREA_HEIGHT = 154;
+const CROSSHAIR_SIZE = 42;
+
+/**
+ * Lente ultra-angular (0,5x) do iPhone, pelo nome que o aparelho dá a ela
+ * ("Back Ultra Wide Camera", ou o equivalente no idioma do aparelho).
+ */
+function acharUltraAngular(lentes: string[]) {
+  return lentes.find((lente) => /ultra/i.test(lente));
+}
+
+// Preset de captura no iOS (ver o comentário no CameraView).
+const PICTURE_SIZE_IOS = '1920x1080';
+
+// Distância do seletor de lente até o pé da prévia.
+const LENS_SELECTOR_BOTTOM = 64;
+
+// Tempo da animação do iOS fechando o seletor de fotos. O expo-image-picker
+// entrega a foto antes de fechar o seletor; esperar evita navegar para a
+// tela da peça com o seletor ainda saindo da tela.
+const SELETOR_FECHANDO_MS = 600;
+
+// Tempo que o iOS leva para desligar uma câmera e ligar a outra. Durante ele
+// a leitura de cor fica pausada e a prévia escurece de leve.
+const LENS_SWITCH_MS = 700;
 
 const DETECTION_INTERVAL_MS = 800;
 const FIRST_DETECTION_DELAY_MS = 900;
@@ -127,13 +163,25 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
   const isCapturingPhotoRef = useRef(false);
   const isValidatingClothingRef = useRef(false);
   const isScreenActiveRef = useRef(true);
+  // Troca de lente em andamento: nenhuma foto é tirada até ela terminar.
+  const isTrocandoLenteRef = useRef(false);
+  // Galeria aberta por cima da câmera: a leitura de cor fica pausada.
+  const isNaGaleriaRef = useRef(false);
+  const trocaLenteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [lensFade] = useState(() => new Animated.Value(0));
 
   const [permission, requestPermission] = useCameraPermissions();
+  // Com outra tela por cima (peça capturada, galeria do app), a câmera e a
+  // leitura de cor param: antes elas seguiam tirando uma foto a cada 0,8 s
+  // no fundo, disputando rede e processador com o cadastro da peça.
+  const isFocused = useIsFocused();
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [result, setResult] = useState<DetectColorResponse | null>(null);
   const [lastMappedResult, setLastMappedResult] =
     useState<MappedColorResult | null>(null);
   const [facing, setFacing] = useState<CameraFacing>('back');
+  const [lentesDisponiveis, setLentesDisponiveis] = useState<string[]>([]);
+  const [lente, setLente] = useState<Lente>('1x');
   const [isFlashOn, setIsFlashOn] = useState(false);
   const [isValidatingClothing, setIsValidatingClothing] = useState(false);
   const [frozenPhotoUri, setFrozenPhotoUri] = useState<string | null>(null);
@@ -141,13 +189,45 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
 
   const warningMessage = getFriendlyWarningMessage(result);
 
+  // A ultra-angular só existe na traseira; no Android o expo-camera não
+  // informa as lentes, e o seletor não aparece.
+  const ultraAngular =
+    facing === 'back' ? acharUltraAngular(lentesDisponiveis) : undefined;
+
+  /**
+   * Prévia em 3:4, a proporção do sensor e da foto. Ocupando a tela inteira,
+   * ela cortava ~40% das laterais da cena e parecia ter zoom; assim ela
+   * mostra exatamente o que a foto vai ter, como a câmera do iPhone.
+   *
+   * Fica entre as faixas de cima e de baixo quando cabe; em tela baixa,
+   * centrada na tela, por baixo das faixas.
+   */
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const previewHeight = (screenWidth * 4) / 3;
+  const espacoLivre = screenHeight - TOP_AREA_HEIGHT - BOTTOM_AREA_HEIGHT;
+  const previewTop =
+    previewHeight <= espacoLivre
+      ? TOP_AREA_HEIGHT + (espacoLivre - previewHeight) / 2
+      : (screenHeight - previewHeight) / 2;
+  const previewFrame = {
+    top: previewTop,
+    width: screenWidth,
+    height: previewHeight,
+  };
+  // No pé da parte visível da prévia, nunca por baixo da faixa dos botões.
+  const lensSelectorTop =
+    Math.min(previewTop + previewHeight, screenHeight - BOTTOM_AREA_HEIGHT) -
+    LENS_SELECTOR_BOTTOM;
+
   const detectCurrentColor = useCallback(async () => {
     if (
       !cameraRef.current ||
       !isCameraReady ||
       isDetectingRef.current ||
       isCapturingPhotoRef.current ||
-      isValidatingClothingRef.current
+      isValidatingClothingRef.current ||
+      isTrocandoLenteRef.current ||
+      isNaGaleriaRef.current
     ) {
       return;
     }
@@ -213,6 +293,8 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
 
     return () => {
       isScreenActiveRef.current = false;
+
+      if (trocaLenteTimer.current) clearTimeout(trocaLenteTimer.current);
     };
   }, []);
   useFocusEffect(
@@ -228,7 +310,7 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
   );
 
   useEffect(() => {
-    if (!permission?.granted || !isCameraReady) {
+    if (!permission?.granted || !isCameraReady || !isFocused) {
       return;
     }
 
@@ -249,18 +331,57 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
         clearInterval(intervalId);
       }
     };
-  }, [permission?.granted, isCameraReady, detectCurrentColor]);
+  }, [permission?.granted, isCameraReady, isFocused, detectCurrentColor]);
+
+  // Espera a leitura de cor e a troca de lente em andamento terminarem.
+  function isCameraOcupada() {
+    return isDetectingRef.current || isTrocandoLenteRef.current;
+  }
 
   async function waitForCurrentColorDetection() {
     for (let attempt = 0; attempt < 8; attempt += 1) {
-      if (!isDetectingRef.current) {
+      if (!isCameraOcupada()) {
         return true;
       }
 
       await sleep(120);
     }
 
-    return !isDetectingRef.current;
+    return !isCameraOcupada();
+  }
+
+  /**
+   * Troca entre 0,5x e 1x. No iOS o expo-camera troca de câmera física (sai
+   * uma, entra outra), o que leva um instante. Uma foto da leitura de cor em
+   * andamento atrasava a troca, então a leitura pausa até ela terminar; o
+   * escurecimento esconde o salto da imagem.
+   */
+  function handleTrocarLente(opcao: Lente) {
+    if (opcao === lente) {
+      return;
+    }
+
+    isTrocandoLenteRef.current = true;
+    if (trocaLenteTimer.current) clearTimeout(trocaLenteTimer.current);
+
+    Animated.timing(lensFade, {
+      toValue: 1,
+      duration: 90,
+      useNativeDriver: true,
+    }).start();
+
+    setLente(opcao);
+
+    trocaLenteTimer.current = setTimeout(() => {
+      trocaLenteTimer.current = null;
+      isTrocandoLenteRef.current = false;
+
+      Animated.timing(lensFade, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+      }).start();
+    }, LENS_SWITCH_MS);
   }
 
   async function handleRequestPermission() {
@@ -273,6 +394,9 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
 
   function handleSwitchCamera() {
     setFacing((currentFacing) => (currentFacing === 'back' ? 'front' : 'back'));
+    // A lista de lentes muda com a câmera; a frontal sempre começa em 1x.
+    setLentesDisponiveis([]);
+    setLente('1x');
     setResult(null);
     setLastMappedResult(null);
     setFrozenPhotoUri(null);
@@ -374,15 +498,110 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
       return;
     }
 
+    await validarFoto(capturedPhotoUri, { origem: 'camera' });
+  }
+
+  /**
+   * Abre a galeria do aparelho. A foto escolhida segue o mesmo caminho da
+   * foto tirada: validação de vestuário, cor e tela da peça capturada.
+   *
+   * A edição fica ligada porque a cor é lida no centro da imagem: recortando,
+   * a pessoa põe a peça no meio, como faria com a mira da câmera.
+   */
+  async function handleAbrirGaleria() {
+    if (isValidatingClothingRef.current || isNaGaleriaRef.current) {
+      return;
+    }
+
+    isNaGaleriaRef.current = true;
+
+    let escolha: ImagePicker.ImagePickerResult;
+
+    try {
+      escolha = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        // Só o Android respeita; o recorte do iOS é sempre quadrado.
+        aspect: [3, 4],
+        quality: 0.65,
+        // HEIC (padrão do iPhone) vem convertido para JPEG.
+        preferredAssetRepresentationMode:
+          ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+      });
+    } catch (error) {
+      console.error('[Câmera] Falha ao abrir a galeria:', error);
+
+      setPopup({
+        variant: 'error',
+        title: 'Não foi possível abrir a galeria',
+        message: 'Tente novamente ou tire uma foto da peça com a câmera.',
+        buttonText: 'Entendi',
+      });
+
+      isNaGaleriaRef.current = false;
+      return;
+    }
+
+    const imagem = escolha.canceled ? null : escolha.assets?.[0];
+
+    if (!imagem) {
+      isNaGaleriaRef.current = false;
+      return;
+    }
+
+    const tipo = tipoDeImagemAceito(imagem.uri, imagem.mimeType);
+
+    // Nenhum popup antes de o seletor sumir; a foto já aparece na prévia.
+    if (tipo) setFrozenPhotoUri(imagem.uri);
+    if (Platform.OS === 'ios') await sleep(SELETOR_FECHANDO_MS);
+
+    if (!isScreenActiveRef.current) {
+      isNaGaleriaRef.current = false;
+      return;
+    }
+
+    if (!tipo) {
+      setPopup({
+        variant: 'error',
+        title: 'Formato não suportado',
+        message: 'Escolha uma foto em JPG, PNG ou WebP.',
+        buttonText: 'Entendi',
+      });
+
+      isNaGaleriaRef.current = false;
+      return;
+    }
+
+    // Uma leitura de cor da câmera em andamento termina antes de seguir.
+    await waitForCurrentColorDetection();
+
+    isValidatingClothingRef.current = true;
+    setIsValidatingClothing(true);
+
+    try {
+      await validarFoto(imagem.uri, { origem: 'galeria', tipo });
+    } finally {
+      isNaGaleriaRef.current = false;
+    }
+  }
+
+  /**
+   * Etapa comum à foto tirada e à escolhida na galeria. Espera que quem
+   * chamou já tenha marcado a validação como em andamento.
+   */
+  async function validarFoto(
+    photoUri: string,
+    { origem, tipo }: { origem: 'camera' | 'galeria'; tipo?: TipoDeImagem },
+  ) {
     try {
       // Só as etapas gratuitas rodam aqui: a validação (CLIP local) e a cor da
       // foto (OpenCV). A análise paga fica para quando a pessoa tocar em
       // "Cadastrar nova peça" — tirar foto não pode gastar com a OpenAI.
-      // A cor não é essencial para seguir: se falhar, usamos a última leitura
-      // do loop da câmera.
+      // A cor não é essencial para seguir: se falhar, a câmera usa a última
+      // leitura do loop, e a galeria deixa o back ler a cor no cadastro.
       const [validation, corDaFoto] = await Promise.all([
-        validateClothingFromImage(capturedPhotoUri),
-        detectColorFromImage(capturedPhotoUri).catch(() => null),
+        validateClothingFromImage(photoUri, tipo),
+        detectColorFromImage(photoUri, tipo).catch(() => null),
       ]);
 
       if (!isScreenActiveRef.current) {
@@ -402,27 +621,36 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
         return;
       }
 
-      // A cor da foto capturada é mais confiável que a última leitura do
-      // loop, que pode ser de um instante anterior com a mira em outro ponto.
+      // A cor da foto é mais confiável que a última leitura do loop, que pode
+      // ser de um instante anterior com a mira em outro ponto. Na galeria a
+      // leitura do loop é de outra coisa (o que a câmera está vendo), então
+      // ela nunca serve de reserva.
+      const leituraDoLoop = origem === 'camera';
+
       const colorName =
         corDaFoto?.colorName ??
-        lastMappedResult?.label ??
-        result?.colorName ??
+        (leituraDoLoop
+          ? (lastMappedResult?.label ?? result?.colorName)
+          : null) ??
         null;
 
       const colorAddSymbol =
         corDaFoto?.colorAddSymbol ??
-        lastMappedResult?.raw.colorAddSymbol ??
-        result?.colorAddSymbol ??
+        (leituraDoLoop
+          ? (lastMappedResult?.raw.colorAddSymbol ?? result?.colorAddSymbol)
+          : null) ??
         null;
 
       const hex =
-        corDaFoto?.hex ?? lastMappedResult?.raw.hex ?? result?.hex ?? null;
+        corDaFoto?.hex ??
+        (leituraDoLoop ? (lastMappedResult?.raw.hex ?? result?.hex) : null) ??
+        null;
 
       setFrozenPhotoUri(null);
 
       navigation.navigate('CapturedClothing', {
-        photoUri: capturedPhotoUri,
+        photoUri,
+        photoTipo: tipo,
         colorName,
         colorAddSymbol,
         hex,
@@ -496,15 +724,47 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
     <View style={styles.screen}>
       <CameraView
         ref={cameraRef}
-        style={styles.camera}
+        style={[styles.camera, previewFrame]}
         facing={facing}
+        // iOS: desliga a sessão da câmera fora de foco (economiza bateria).
+        active={isFocused}
+        // iOS: fotos em Full HD em vez da resolução máxima do sensor (12 a
+        // 48 MP). A leitura de cor tira uma foto a cada 0,8 s, e cada foto
+        // cheia (processamento multiquadro, conversão para JPEG e leitura do
+        // arquivo de vários MB pelo JS) engasgava a imagem em intervalos.
+        // Com o preset 1080p o preview segue nítido, o enquadramento lateral
+        // é o mesmo e a mira continua no centro da foto. A foto do cadastro
+        // também sai em 1080×1920, o que basta para o armário e a análise.
+        pictureSize={Platform.OS === 'ios' ? PICTURE_SIZE_IOS : undefined}
         enableTorch={isFlashOn}
+        // Android: prévia em 4:3, encaixada sem cortar (o iOS segue a view).
+        ratio="4:3"
+        // Sem valor, o iOS usa a lente principal (1x).
+        selectedLens={lente === '0.5x' ? ultraAngular : undefined}
+        onAvailableLensesChanged={(event) => setLentesDisponiveis(event.lenses)}
         onCameraReady={() => setIsCameraReady(true)}
       />
 
       {frozenPhotoUri ? (
-        <Image source={{ uri: frozenPhotoUri }} style={styles.frozenPreview} />
+        <Image
+          source={{ uri: frozenPhotoUri }}
+          style={[styles.frozenPreview, previewFrame]}
+        />
       ) : null}
+
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.lensFade,
+          previewFrame,
+          {
+            opacity: lensFade.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, 0.6],
+            }),
+          },
+        ]}
+      />
 
       <View pointerEvents="none" style={styles.darkTopOverlay} />
       <View pointerEvents="none" style={styles.darkBottomOverlay} />
@@ -540,18 +800,63 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
           style={styles.topIconButton}
           onPress={handleToggleFlash}
         >
+          {/* O ícone mostra o estado atual, como na câmera do iPhone: raio
+              cortado com o flash desligado, raio inteiro com ele ligado. */}
           {isFlashOn ? (
-            <FlashOffIcon width={28} height={28} color="#FFFFFF" />
-          ) : (
             <FlashIcon width={28} height={28} color="#FFFFFF" />
+          ) : (
+            <FlashOffIcon width={28} height={28} color="#FFFFFF" />
           )}
         </TouchableOpacity>
       </View>
 
-      <View pointerEvents="none" style={styles.crosshair}>
+      {/* No centro da prévia, que é o centro da foto: é ali que a visão lê
+          a cor. */}
+      <View
+        pointerEvents="none"
+        style={[
+          styles.crosshair,
+          { top: previewTop + previewHeight / 2 - CROSSHAIR_SIZE / 2 },
+        ]}
+      >
         <View style={styles.crossVertical} />
         <View style={styles.crossHorizontal} />
       </View>
+
+      {ultraAngular ? (
+        <View
+          pointerEvents="box-none"
+          style={[styles.lensSelectorRow, { top: lensSelectorTop }]}
+        >
+          <View style={styles.lensSelector}>
+            {(['0.5x', '1x'] as const).map((opcao) => {
+              const ativa = lente === opcao;
+
+              return (
+                <TouchableOpacity
+                  key={opcao}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    opcao === '0.5x'
+                      ? 'Zoom 0,5x, mostra mais da cena'
+                      : 'Zoom 1x, normal'
+                  }
+                  accessibilityState={{ selected: ativa }}
+                  activeOpacity={0.8}
+                  style={[styles.lensButton, ativa && styles.lensButtonActive]}
+                  onPress={() => handleTrocarLente(opcao)}
+                >
+                  <Text
+                    style={[styles.lensText, ativa && styles.lensTextActive]}
+                  >
+                    {opcao === '0.5x' ? '0,5x' : '1x'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
 
       {warningMessage ? (
         <View style={styles.warningArea}>
@@ -563,6 +868,7 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
           etapa a cada foto, sem precisar zerar o estado por dentro. */}
       {isValidatingClothing ? (
         <ZyraLoadingPopup
+          modal={false}
           visible
           title="Conferindo sua foto"
           steps={CAPTURE_STEPS}
@@ -575,7 +881,8 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
           accessibilityLabel="Abrir galeria"
           activeOpacity={0.85}
           style={styles.bottomIconButton}
-          onPress={() => console.log('[Câmera] Galeria ainda não integrada.')}
+          disabled={isValidatingClothing}
+          onPress={handleAbrirGaleria}
         >
           <GalleryIcon width={34} height={34} color="#FFFFFF" />
         </TouchableOpacity>
@@ -584,18 +891,23 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
           accessibilityRole="button"
           accessibilityLabel="Capturar foto"
           activeOpacity={0.85}
-          style={[
-            styles.captureOuter,
-            isValidatingClothing && styles.captureOuterLoading,
-          ]}
+          style={styles.captureOuter}
           disabled={isValidatingClothing}
           onPress={handleCaptureAndValidateClothing}
         >
-          {isValidatingClothing ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
-          ) : (
-            <View style={styles.captureInner} />
-          )}
+          {/* Anel branco com vão e centro no degradê rosa do app: o branco
+              maciço de antes pesava demais ao lado dos ícones de traço. */}
+          <LinearGradient
+            colors={theme.gradientPrimary.colors}
+            locations={theme.gradientPrimary.locations}
+            start={theme.gradientPrimary.start}
+            end={theme.gradientPrimary.end}
+            style={styles.captureInner}
+          >
+            {isValidatingClothing ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : null}
+          </LinearGradient>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -610,6 +922,7 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
       </View>
 
       <ZyraPopup
+        modal={false}
         visible={Boolean(popup)}
         variant={popup?.variant ?? 'info'}
         title={popup?.title ?? ''}
@@ -628,12 +941,56 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
+  // Posição e tamanho vêm do previewFrame (3:4, entre as faixas).
   camera: {
-    ...StyleSheet.absoluteFill,
+    position: 'absolute',
+    left: 0,
   },
   frozenPreview: {
-    ...StyleSheet.absoluteFill,
+    position: 'absolute',
+    left: 0,
     resizeMode: 'cover',
+  },
+  lensFade: {
+    position: 'absolute',
+    left: 0,
+    backgroundColor: '#000000',
+  },
+  // Seletor de lente no pé da prévia, como na câmera do iPhone.
+  lensSelectorRow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  lensSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    padding: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  lensButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // A ativa tem fundo branco e texto maior: não depende só da cor.
+  lensButtonActive: {
+    backgroundColor: 'rgba(255,255,255,0.92)',
+  },
+  lensText: {
+    color: '#FFFFFF',
+    fontFamily: theme.fonts.semiBold,
+    fontSize: 11,
+  },
+  lensTextActive: {
+    color: '#000000',
+    fontFamily: theme.fonts.bold,
+    fontSize: 13,
   },
   darkTopOverlay: {
     position: 'absolute',
@@ -693,12 +1050,10 @@ const styles = StyleSheet.create({
   },
   crosshair: {
     position: 'absolute',
-    top: '50%',
     left: '50%',
-    width: 42,
-    height: 42,
-    marginLeft: -21,
-    marginTop: -21,
+    width: CROSSHAIR_SIZE,
+    height: CROSSHAIR_SIZE,
+    marginLeft: -CROSSHAIR_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -754,23 +1109,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Proporção do obturador do iPhone: anel de 4 px e um vão de 3 px até o
+  // centro, para o anel e o centro se lerem como duas partes.
   captureOuter: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-    borderWidth: 3,
+    width: 74,
+    height: 74,
+    borderRadius: 37,
+    borderWidth: 4,
     borderColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  captureOuterLoading: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
   captureInner: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#FFFFFF',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   permissionScreen: {
     flex: 1,

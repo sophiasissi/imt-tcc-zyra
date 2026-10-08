@@ -1,5 +1,5 @@
 import { apiRequest } from './api';
-import { Peca } from './pecasApi';
+import { Ocasiao, Peca } from './pecasApi';
 
 /** Lugar da peça no look: o app usa para ordenar e descrever. */
 export type PapelNoLook =
@@ -34,6 +34,13 @@ export type RespostaLook =
       mensagem: string;
       avisos: string[];
       pecas: PecaDoLook[];
+      /**
+       * Evento pedido em poucas palavras ("Casamento à noite"), gerado pela IA
+       * na interpretação do pedido. Opcional até o back passar a enviar.
+       */
+      titulo?: string | null;
+      /** Ocasião entendida no pedido; vai junto quando o look é salvo. */
+      ocasiao?: Ocasiao | null;
     };
 
 export type SugerirLookInput = {
@@ -53,5 +60,48 @@ export function sugerirLook(input: SugerirLookInput, token: string) {
     token,
     // Inclui a interpretação do pedido pela OpenAI.
     timeoutMs: 30_000,
+  });
+}
+
+/** Look da Galeria de Looks, como o GET /looks devolve. */
+export type LookSalvo = {
+  id: string;
+  /** Título do evento pedido; looks antigos podem não ter. */
+  nome: string | null;
+  ocasiao: Ocasiao | null;
+  criadoEm: string;
+  /** Já na ordem do look: superior, sobreposição, inferior, peça única, calçado. */
+  pecas: PecaDoLook[];
+};
+
+export type SalvarLookInput = {
+  pecaIds: string[];
+  /** O back aceita até 60 caracteres. */
+  nome?: string;
+  ocasiao?: Ocasiao;
+};
+
+/**
+ * Salva o look na Galeria de Looks. Salvar as mesmas peças de novo devolve o
+ * look que já existe, sem criar cópia.
+ */
+export function salvarLook(input: SalvarLookInput, token: string) {
+  return apiRequest<LookSalvo>('/looks', {
+    method: 'POST',
+    body: JSON.stringify(input),
+    token,
+  });
+}
+
+/** Looks salvos, do mais recente para o mais antigo. */
+export function listarLooks(token: string) {
+  return apiRequest<LookSalvo[]>('/looks', { token });
+}
+
+/** Tira o look da Galeria de Looks. As peças continuam no armário. */
+export function removerLook(id: string, token: string) {
+  return apiRequest<{ message: string }>(`/looks/${id}`, {
+    method: 'DELETE',
+    token,
   });
 }

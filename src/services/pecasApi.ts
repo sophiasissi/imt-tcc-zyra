@@ -1,4 +1,4 @@
-import { photoFormDataPart } from '../utils/photoUpload';
+import { photoFormDataPart, TipoDeImagem } from '../utils/photoUpload';
 import { apiRequest } from './api';
 
 // Códigos da taxonomia de peças: os mesmos dos enums do Prisma no back e do
@@ -69,10 +69,14 @@ export type Peca = {
   colorAddSymbolSecundario: string | null;
   criadoEm: string;
   atualizadoEm: string;
+  /** Looks salvos que usam a peça; saem junto se ela for excluída. */
+  totalLooks?: number;
 };
 
 export type CadastrarPecaInput = {
   photoUri: string;
+  /** Tipo da imagem da galeria; sem ele, JPEG (o que a câmera grava). */
+  photoTipo?: TipoDeImagem;
   /** Sem a cor completa, o back lê a cor da foto sozinho. */
   corNome?: string | null;
   hex?: string | null;
@@ -105,7 +109,10 @@ export type AtualizarPecaInput = Partial<
 export function cadastrarPeca(input: CadastrarPecaInput, token: string) {
   const formData = new FormData();
 
-  formData.append('foto', photoFormDataPart(input.photoUri, 'roupa.jpg'));
+  formData.append(
+    'foto',
+    photoFormDataPart(input.photoUri, 'roupa', input.photoTipo),
+  );
 
   // Campo vazio não vai: o back valida o hex e recusaria string vazia.
   if (input.corNome) formData.append('corNome', input.corNome);
@@ -139,9 +146,13 @@ export function atualizarPeca(
   });
 }
 
+/** Exclui a peça, a foto no S3 e os looks salvos que a usam. */
 export function removerPeca(id: string, token: string) {
-  return apiRequest<{ message: string }>(`/pecas/${id}`, {
-    method: 'DELETE',
-    token,
-  });
+  return apiRequest<{ message: string; looksRemovidos?: number }>(
+    `/pecas/${id}`,
+    {
+      method: 'DELETE',
+      token,
+    },
+  );
 }

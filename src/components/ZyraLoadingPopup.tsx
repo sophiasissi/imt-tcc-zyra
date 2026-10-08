@@ -16,6 +16,14 @@ type Props = {
    */
   steps: string[];
   stepDurationMs?: number;
+  /**
+   * false: desenha o popup como uma camada dentro da tela, em vez de um
+   * Modal nativo. No iOS, um Modal abrindo ou fechando junto com outra
+   * transição (seletor de fotos, navegação, outro Modal) é descartado em
+   * silêncio e deixa uma camada invisível que trava os toques. Use false nas
+   * telas em que o popup some e a navegação acontece no mesmo instante.
+   */
+  modal?: boolean;
 };
 
 const DEFAULT_STEP_MS = 2200;
@@ -25,6 +33,7 @@ export function ZyraLoadingPopup({
   title = 'Analisando sua peça',
   steps,
   stepDurationMs = DEFAULT_STEP_MS,
+  modal = true,
 }: Props) {
   const [stepIndex, setStepIndex] = useState(0);
 
@@ -47,42 +56,60 @@ export function ZyraLoadingPopup({
 
   const currentStep = steps[stepIndex] ?? steps[0];
 
+  const conteudo = (
+    <View style={styles.overlay}>
+      <LinearGradient
+        colors={['#AB003E', '#D66A92']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.card}
+        accessible
+        accessibilityRole="progressbar"
+        accessibilityLabel={`${title}. ${currentStep}.`}
+        accessibilityLiveRegion="polite"
+      >
+        <ActivityIndicator color="#FFFFFF" size="large" />
+
+        <Text style={styles.title}>{title}</Text>
+
+        <Text style={styles.step}>{currentStep}</Text>
+
+        <View style={styles.dots}>
+          {steps.map((step, index) => (
+            <View
+              key={step}
+              style={[styles.dot, index <= stepIndex && styles.dotActive]}
+            />
+          ))}
+        </View>
+
+        <Text style={styles.hint}>Isso leva alguns segundos.</Text>
+      </LinearGradient>
+    </View>
+  );
+
+  if (!modal) {
+    return visible ? (
+      <View style={styles.inlineLayer} accessibilityViewIsModal>
+        {conteudo}
+      </View>
+    ) : null;
+  }
+
   return (
     <Modal transparent visible={visible} animationType="fade">
-      <View style={styles.overlay}>
-        <LinearGradient
-          colors={['#AB003E', '#D66A92']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.card}
-          accessible
-          accessibilityRole="progressbar"
-          accessibilityLabel={`${title}. ${currentStep}.`}
-          accessibilityLiveRegion="polite"
-        >
-          <ActivityIndicator color="#FFFFFF" size="large" />
-
-          <Text style={styles.title}>{title}</Text>
-
-          <Text style={styles.step}>{currentStep}</Text>
-
-          <View style={styles.dots}>
-            {steps.map((step, index) => (
-              <View
-                key={step}
-                style={[styles.dot, index <= stepIndex && styles.dotActive]}
-              />
-            ))}
-          </View>
-
-          <Text style={styles.hint}>Isso leva alguns segundos.</Text>
-        </LinearGradient>
-      </View>
+      {conteudo}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  // Por cima de tudo na tela que o usa (deve ser o último filho da raiz).
+  inlineLayer: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 1000,
+    elevation: 1000,
+  },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.75)',

@@ -32,7 +32,7 @@ const CADASTRO_STEPS = [
 ];
 
 export function CapturedClothingScreen({ navigation, route }: Props) {
-  const { photoUri, colorName, colorAddSymbol, hex } = route.params;
+  const { photoUri, photoTipo, colorName, colorAddSymbol, hex } = route.params;
   const { tokens } = useAuth();
 
   const [isCadastrando, setIsCadastrando] = useState(false);
@@ -62,6 +62,7 @@ export function CapturedClothingScreen({ navigation, route }: Props) {
       await cadastrarPeca(
         {
           photoUri,
+          photoTipo,
           corNome: colorName,
           hex,
           colorAddSymbol,
@@ -178,6 +179,7 @@ export function CapturedClothingScreen({ navigation, route }: Props) {
           a cada tentativa. */}
       {isCadastrando ? (
         <ZyraLoadingPopup
+          modal={false}
           visible
           title="Cadastrando sua peça"
           steps={CADASTRO_STEPS}
@@ -185,6 +187,7 @@ export function CapturedClothingScreen({ navigation, route }: Props) {
       ) : null}
 
       <ZyraPopup
+        modal={false}
         visible={Boolean(popup)}
         variant={popup?.variant ?? 'info'}
         title={popup?.title ?? ''}

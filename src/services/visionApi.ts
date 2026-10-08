@@ -2,7 +2,7 @@ import {
   fetchWithTimeout,
   isNetworkErrorMessage,
 } from '../utils/fetchWithTimeout';
-import { photoFormDataPart } from '../utils/photoUpload';
+import { photoFormDataPart, TipoDeImagem } from '../utils/photoUpload';
 
 // O /detect-color e o /validate-clothing respondem em menos de um segundo na
 // rede local. Passar muito disso é sinal de servidor inalcançável.
@@ -36,11 +36,12 @@ export type ValidateClothingResponse = {
 async function postImageFile<TResponse>(
   endpoint: string,
   imageUri: string,
-  fileName: string,
+  nomeBase: string,
+  tipo?: TipoDeImagem,
 ): Promise<TResponse> {
   const formData = new FormData();
 
-  formData.append('file', photoFormDataPart(imageUri, fileName));
+  formData.append('file', photoFormDataPart(imageUri, nomeBase, tipo));
 
   const url = `${VISION_API_URL}${endpoint}`;
 
@@ -92,22 +93,27 @@ async function postImageFile<TResponse>(
   return data as TResponse;
 }
 
+/** `tipo` só é preciso para imagens da galeria; a câmera grava JPEG. */
 export async function detectColorFromImage(
   imageUri: string,
+  tipo?: TipoDeImagem,
 ): Promise<DetectColorResponse> {
   return postImageFile<DetectColorResponse>(
     '/detect-color',
     imageUri,
-    'camera-frame.jpg',
+    'camera-frame',
+    tipo,
   );
 }
 
 export async function validateClothingFromImage(
   imageUri: string,
+  tipo?: TipoDeImagem,
 ): Promise<ValidateClothingResponse> {
   return postImageFile<ValidateClothingResponse>(
     '/validate-clothing',
     imageUri,
-    'clothing-validation.jpg',
+    'clothing-validation',
+    tipo,
   );
 }
