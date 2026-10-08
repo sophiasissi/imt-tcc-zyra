@@ -64,3 +64,6 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp.env
+
+# Contexto local do Claude Code (cada pessoa mantém o seu)
+CLAUDE.md
