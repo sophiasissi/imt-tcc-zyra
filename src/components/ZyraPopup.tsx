@@ -10,6 +10,9 @@ export type ZyraPopupConfig = {
   title: string;
   message?: string;
   buttonText?: string;
+  /** Segunda ação, mostrada como link abaixo do botão principal. */
+  secondaryButtonText?: string;
+  onSecondaryPress?: () => void;
   showCloseButton?: boolean;
   customIcon?: React.ReactNode;
   onConfirm?: () => void;
@@ -52,6 +55,8 @@ export function ZyraPopup({
   title,
   message,
   buttonText = 'Entendi',
+  secondaryButtonText,
+  onSecondaryPress,
   showCloseButton = false,
   customIcon,
   onConfirm,
@@ -101,6 +106,19 @@ export function ZyraPopup({
             onPress={onConfirm}
             style={styles.actionButton}
           />
+
+          {secondaryButtonText && onSecondaryPress ? (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={secondaryButtonText}
+              activeOpacity={0.75}
+              hitSlop={8}
+              style={styles.secondaryButton}
+              onPress={onSecondaryPress}
+            >
+              <Text style={styles.secondaryText}>{secondaryButtonText}</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
     </Modal>
@@ -183,6 +201,16 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     height: 50,
+  },
+  secondaryButton: {
+    marginTop: 16,
+    paddingVertical: 4,
+  },
+  secondaryText: {
+    color: theme.colors.link,
+    fontFamily: theme.fonts.semiBold,
+    fontSize: 15,
+    textDecorationLine: 'underline',
   },
   customIconWrapper: {
     width: 64,

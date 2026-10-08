@@ -1,4 +1,4 @@
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import LittleGuy from '../../assets/images/littleguy.svg';
@@ -25,7 +25,10 @@ export function RegisterWelcomeScreen({ navigation, route }: Props) {
       footer={<ZyraButton title="Continuar" onPress={handleContinue} />}
     >
       <Text style={styles.logo}>ZYRA</Text>
-      <LittleGuy style={styles.character} />
+      {/* O boneco ocupa o espaço que sobra e encolhe em celular menor. */}
+      <View style={styles.character}>
+        <LittleGuy width="100%" height="100%" />
+      </View>
       <Text style={styles.welcomeText}>Bem vindo(a), {firstName}</Text>
       <Text style={styles.description}>
         Que tal me contar um pouco sobre você?
@@ -45,6 +48,11 @@ const styles = StyleSheet.create({
     marginTop: 30,
   },
   character: {
+    flex: 1,
+    width: '100%',
+    // Tamanho original do desenho (242 x 463).
+    maxHeight: 463,
+    minHeight: 140,
     marginBottom: 26,
   },
   welcomeText: {
@@ -60,5 +68,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.medium,
     fontSize: 15,
     lineHeight: 23,
+    // Distância até o botão Continuar.
+    marginBottom: 24,
   },
 });

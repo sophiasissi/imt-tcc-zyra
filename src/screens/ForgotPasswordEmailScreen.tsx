@@ -136,7 +136,9 @@ export function ForgotPasswordEmailScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  // No centro da área livre: quando o teclado abre, a área encolhe e os
+  // campos sobem junto com ele.
   content: {
-    marginTop: 150,
+    justifyContent: 'center',
   },
 });

@@ -1,4 +1,4 @@
-import { StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import GoogleIcon from '../../assets/icons/googleColor.svg';
 import LoginLogo from '../../assets/images/login_logo.svg';
@@ -15,7 +15,11 @@ export function RegisterStartScreen({ navigation }: Props) {
       onBack={() => navigation.goBack()}
       contentStyle={styles.content}
     >
-      <LoginLogo style={styles.hero} />
+      {/* A ilustração ocupa o espaço que sobra e encolhe em celular menor:
+          o resto da tela sempre cabe sem rolar. */}
+      <View style={styles.hero}>
+        <LoginLogo width="100%" height="100%" />
+      </View>
       <Text style={styles.welcome}>Bem vindo(a) ao</Text>
       <Text style={styles.brand}>ZYRA</Text>
       <Text style={styles.legal}>
@@ -56,7 +60,13 @@ const styles = StyleSheet.create({
     paddingBottom: 29,
   },
   hero: {
-    marginBottom: 30,
+    flex: 1,
+    width: '100%',
+    // Tamanho original do desenho (293 x 381): não passa disso em celular grande.
+    maxHeight: 381,
+    minHeight: 120,
+    marginTop: 12,
+    marginBottom: 24,
   },
   welcome: {
     color: theme.colors.titleZyra,
