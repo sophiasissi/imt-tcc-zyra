@@ -12,6 +12,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'RegisterStart'>;
 export function RegisterStartScreen({ navigation }: Props) {
   return (
     <AuthLayout
+      rolavel={false}
       onBack={() => navigation.goBack()}
       contentStyle={styles.content}
     >

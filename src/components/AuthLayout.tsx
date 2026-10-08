@@ -57,6 +57,11 @@ type Props = {
   onBack?: () => void;
   contentStyle?: StyleProp<ViewStyle>;
   titleStyle?: StyleProp<TextStyle>;
+  /**
+   * false para telas sem campos que precisam caber inteiras (com ilustração
+   * que encolhe): sem a área rolável, o conteúdo nunca passa da tela.
+   */
+  rolavel?: boolean;
 };
 
 export function AuthLayout({
@@ -70,6 +75,7 @@ export function AuthLayout({
   onBack,
   contentStyle,
   titleStyle,
+  rolavel = true,
 }: Props) {
   const hasDefaultFooterButton = Boolean(
     footerButtonTitle && onFooterButtonPress,
@@ -204,38 +210,51 @@ export function AuthLayout({
             </View>
           ) : null}
 
-          <ScrollView
-            ref={scrollRef}
-            style={styles.scroll}
-            contentContainerStyle={[
-              styles.content,
-              !showHeader && styles.contentNoHeader,
-              contentStyle,
-            ]}
-            scrollEnabled={podeRolar}
-            bounces={false}
-            alwaysBounceVertical={false}
-            overScrollMode="never"
-            onLayout={(event) => {
-              alturaVisivel.current = event.nativeEvent.layout.height;
-              atualizarRolagem();
-            }}
-            onContentSizeChange={(_largura, altura) => {
-              alturaConteudo.current = altura;
-              atualizarRolagem();
-            }}
-            onScroll={(event) => {
-              rolagem.current = event.nativeEvent.contentOffset.y;
-            }}
-            scrollEventThrottle={16}
-            keyboardShouldPersistTaps="never"
-            keyboardDismissMode={
-              Platform.OS === 'ios' ? 'interactive' : 'on-drag'
-            }
-            showsVerticalScrollIndicator={false}
-          >
-            {children}
-          </ScrollView>
+          {!rolavel ? (
+            <View
+              style={[
+                styles.scroll,
+                styles.content,
+                !showHeader && styles.contentNoHeader,
+                contentStyle,
+              ]}
+            >
+              {children}
+            </View>
+          ) : (
+            <ScrollView
+              ref={scrollRef}
+              style={styles.scroll}
+              contentContainerStyle={[
+                styles.content,
+                !showHeader && styles.contentNoHeader,
+                contentStyle,
+              ]}
+              scrollEnabled={podeRolar}
+              bounces={false}
+              alwaysBounceVertical={false}
+              overScrollMode="never"
+              onLayout={(event) => {
+                alturaVisivel.current = event.nativeEvent.layout.height;
+                atualizarRolagem();
+              }}
+              onContentSizeChange={(_largura, altura) => {
+                alturaConteudo.current = altura;
+                atualizarRolagem();
+              }}
+              onScroll={(event) => {
+                rolagem.current = event.nativeEvent.contentOffset.y;
+              }}
+              scrollEventThrottle={16}
+              keyboardShouldPersistTaps="never"
+              keyboardDismissMode={
+                Platform.OS === 'ios' ? 'interactive' : 'on-drag'
+              }
+              showsVerticalScrollIndicator={false}
+            >
+              {children}
+            </ScrollView>
+          )}
 
           {hasDefaultFooterButton ? (
             <View style={styles.footer}>

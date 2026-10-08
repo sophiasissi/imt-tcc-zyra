@@ -20,6 +20,7 @@ export function RegisterWelcomeScreen({ navigation, route }: Props) {
 
   return (
     <AuthLayout
+      rolavel={false}
       showHeader={false}
       contentStyle={styles.content}
       footer={<ZyraButton title="Continuar" onPress={handleContinue} />}
@@ -40,6 +41,8 @@ export function RegisterWelcomeScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   content: {
     alignItems: 'center',
+    // Em celular grande, a sobra fica dividida em cima e embaixo.
+    justifyContent: 'center',
   },
   logo: {
     color: theme.colors.titleZyra,
