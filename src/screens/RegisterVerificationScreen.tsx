@@ -242,7 +242,12 @@ export function RegisterVerificationScreen({ navigation, route }: Props) {
           buttonText: 'Ir para login',
           onConfirm: () => {
             setPopup(null);
-            navigation.navigate('Login');
+            // Sai do cadastro: a pilha vira Intro → Login, e o "voltar" do login
+            // leva para o início em vez de passar de novo pelas telas do cadastro.
+            navigation.reset({
+              index: 1,
+              routes: [{ name: 'Intro' }, { name: 'Login', params: { email } }],
+            });
           },
         });
 
@@ -342,8 +347,10 @@ export function RegisterVerificationScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
+  // No centro da área livre: quando o teclado abre, a área encolhe e os
+  // campos sobem junto com ele.
   content: {
-    paddingTop: 150,
+    justifyContent: 'center',
   },
   heading: {
     color: theme.colors.label,

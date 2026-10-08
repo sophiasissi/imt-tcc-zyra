@@ -100,9 +100,10 @@ export function ForgotPasswordNewPasswordScreen({ navigation, route }: Props) {
         onConfirm: () => {
           setPopup(null);
 
+          // Intro antes do login: sem ela, o "voltar" do login fecha o app.
           navigation.reset({
-            index: 0,
-            routes: [{ name: 'Login' }],
+            index: 1,
+            routes: [{ name: 'Intro' }, { name: 'Login', params: { email } }],
           });
         },
       });
@@ -229,8 +230,10 @@ export function ForgotPasswordNewPasswordScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
+  // No centro da área livre: quando o teclado abre, a área encolhe e os
+  // campos sobem junto com ele.
   content: {
-    paddingTop: 150,
+    justifyContent: 'center',
   },
   validationList: {
     marginTop: -6,
