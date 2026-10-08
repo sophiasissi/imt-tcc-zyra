@@ -69,6 +69,8 @@ export type Peca = {
   colorAddSymbolSecundario: string | null;
   criadoEm: string;
   atualizadoEm: string;
+  /** Looks salvos que usam a peça; saem junto se ela for excluída. */
+  totalLooks?: number;
 };
 
 export type CadastrarPecaInput = {
@@ -139,9 +141,13 @@ export function atualizarPeca(
   });
 }
 
+/** Exclui a peça, a foto no S3 e os looks salvos que a usam. */
 export function removerPeca(id: string, token: string) {
-  return apiRequest<{ message: string }>(`/pecas/${id}`, {
-    method: 'DELETE',
-    token,
-  });
+  return apiRequest<{ message: string; looksRemovidos?: number }>(
+    `/pecas/${id}`,
+    {
+      method: 'DELETE',
+      token,
+    },
+  );
 }

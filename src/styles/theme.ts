@@ -33,4 +33,11 @@ export const theme = {
     black: 'PoppinsBlack',
     title: 'Jomhuria',
   },
+  /** Degradê rosa da bolinha do chat e do perfil, para os botões de destaque. */
+  gradientPrimary: {
+    colors: ['#DE0051', '#AB003E', '#78002C'],
+    locations: [0.3, 0.67, 1],
+    start: { x: 1, y: 0 },
+    end: { x: 0, y: 1 },
+  },
 } as const;
