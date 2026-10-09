@@ -61,6 +61,7 @@ async function carregarOuCriarPerfil(
   accessToken: string,
   email: string,
   nome?: string,
+  versaoTermosAceita?: string,
 ) {
   try {
     return await apiRequest<UserProfile>('/users/me', {
@@ -77,7 +78,7 @@ async function carregarOuCriarPerfil(
     await apiRequest<UserProfile>('/auth/register-profile', {
       method: 'POST',
       token: accessToken,
-      body: JSON.stringify({ nome, email }),
+      body: JSON.stringify({ nome, email, versaoTermosAceita }),
     });
 
     return apiRequest<UserProfile>('/users/me', {
@@ -90,7 +91,7 @@ async function carregarOuCriarPerfil(
 export function RegisterVerificationScreen({ navigation, route }: Props) {
   const { signIn } = useAuth();
 
-  const { firstName, name, email, password } = route.params;
+  const { firstName, name, email, password, versaoTermosAceita } = route.params;
 
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -203,6 +204,7 @@ export function RegisterVerificationScreen({ navigation, route }: Props) {
         loginResponse.accessToken,
         email,
         name,
+        versaoTermosAceita,
       );
 
       await signIn(loginResponse, profileResponse);
