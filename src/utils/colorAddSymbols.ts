@@ -1,52 +1,55 @@
-import { ImageSourcePropType } from 'react-native';
+import { Image, ImageSourcePropType } from 'react-native';
 
 type ColorAddSymbolData = {
   label: string;
   image: ImageSourcePropType;
 };
 
-const amareloClaro = require('../../assets/coloradd/preto/amarelo claro.png');
-const amareloEscuro = require('../../assets/coloradd/preto/amarelo escuro.png');
-const amarelo = require('../../assets/coloradd/preto/amarelo.png');
+// Cópias de 144 px dos símbolos de assets/coloradd/preto (3x o maior tamanho
+// em que aparecem, 46 px na câmera). Os originais têm 568 a 1024 px e
+// demoravam para aparecer em toda tela com símbolo.
+const amareloClaro = require('../../assets/coloradd/app/simbolos/amarelo claro.png');
+const amareloEscuro = require('../../assets/coloradd/app/simbolos/amarelo escuro.png');
+const amarelo = require('../../assets/coloradd/app/simbolos/amarelo.png');
 
-const azulClaro = require('../../assets/coloradd/preto/azul claro.png');
-const azulEscuro = require('../../assets/coloradd/preto/azul escuro.png');
-const azul = require('../../assets/coloradd/preto/azul.png');
+const azulClaro = require('../../assets/coloradd/app/simbolos/azul claro.png');
+const azulEscuro = require('../../assets/coloradd/app/simbolos/azul escuro.png');
+const azul = require('../../assets/coloradd/app/simbolos/azul.png');
 
-const branco = require('../../assets/coloradd/preto/branco.png');
+const branco = require('../../assets/coloradd/app/simbolos/branco.png');
 
-const castanhoClaro = require('../../assets/coloradd/preto/castanho claro.png');
-const castanhoEscuro = require('../../assets/coloradd/preto/castanho escuro.png');
-const castanho = require('../../assets/coloradd/preto/castanho.png');
+const castanhoClaro = require('../../assets/coloradd/app/simbolos/castanho claro.png');
+const castanhoEscuro = require('../../assets/coloradd/app/simbolos/castanho escuro.png');
+const castanho = require('../../assets/coloradd/app/simbolos/castanho.png');
 
-const cinzaClaro = require('../../assets/coloradd/preto/cinza claro.png');
-const cinzaEscuro = require('../../assets/coloradd/preto/cinza escuro.png');
-const cinza = require('../../assets/coloradd/preto/cinza.png');
+const cinzaClaro = require('../../assets/coloradd/app/simbolos/cinza claro.png');
+const cinzaEscuro = require('../../assets/coloradd/app/simbolos/cinza escuro.png');
+const cinza = require('../../assets/coloradd/app/simbolos/cinza.png');
 
-const dourado = require('../../assets/coloradd/preto/dourado.png');
+const dourado = require('../../assets/coloradd/app/simbolos/dourado.png');
 
-const laranjaClaro = require('../../assets/coloradd/preto/laranja claro.png');
-const laranjaEscuro = require('../../assets/coloradd/preto/laranja escuro.png');
-const laranja = require('../../assets/coloradd/preto/laranja.png');
+const laranjaClaro = require('../../assets/coloradd/app/simbolos/laranja claro.png');
+const laranjaEscuro = require('../../assets/coloradd/app/simbolos/laranja escuro.png');
+const laranja = require('../../assets/coloradd/app/simbolos/laranja.png');
 
-const prateado = require('../../assets/coloradd/preto/prateado.png');
-const preto = require('../../assets/coloradd/preto/preto.png');
+const prateado = require('../../assets/coloradd/app/simbolos/prateado.png');
+const preto = require('../../assets/coloradd/app/simbolos/preto.png');
 
-const rosaClaro = require('../../assets/coloradd/preto/rosa claro.png');
-const rosaEscuro = require('../../assets/coloradd/preto/rosa escuro.png');
-const rosa = require('../../assets/coloradd/preto/rosa.png');
+const rosaClaro = require('../../assets/coloradd/app/simbolos/rosa claro.png');
+const rosaEscuro = require('../../assets/coloradd/app/simbolos/rosa escuro.png');
+const rosa = require('../../assets/coloradd/app/simbolos/rosa.png');
 
-const roxoClaro = require('../../assets/coloradd/preto/roxo claro.png');
-const roxoEscuro = require('../../assets/coloradd/preto/roxo escuro.png');
-const roxo = require('../../assets/coloradd/preto/roxo.png');
+const roxoClaro = require('../../assets/coloradd/app/simbolos/roxo claro.png');
+const roxoEscuro = require('../../assets/coloradd/app/simbolos/roxo escuro.png');
+const roxo = require('../../assets/coloradd/app/simbolos/roxo.png');
 
-const verdeClaro = require('../../assets/coloradd/preto/verde claro.png');
-const verdeEscuro = require('../../assets/coloradd/preto/verde escuro.png');
-const verde = require('../../assets/coloradd/preto/verde.png');
+const verdeClaro = require('../../assets/coloradd/app/simbolos/verde claro.png');
+const verdeEscuro = require('../../assets/coloradd/app/simbolos/verde escuro.png');
+const verde = require('../../assets/coloradd/app/simbolos/verde.png');
 
-const vermelhoClaro = require('../../assets/coloradd/preto/vermelho claro.png');
-const vermelhoEscuro = require('../../assets/coloradd/preto/vermelho escuro.png');
-const vermelho = require('../../assets/coloradd/preto/vermelho.png');
+const vermelhoClaro = require('../../assets/coloradd/app/simbolos/vermelho claro.png');
+const vermelhoEscuro = require('../../assets/coloradd/app/simbolos/vermelho escuro.png');
+const vermelho = require('../../assets/coloradd/app/simbolos/vermelho.png');
 
 const symbolMap: Record<string, ColorAddSymbolData> = {
   AMARELO_CLARO: {
@@ -204,4 +207,32 @@ export function getColorAddSymbol(symbolName?: string | null) {
   const normalized = normalizeSymbolName(symbolName);
 
   return symbolMap[normalized] ?? null;
+}
+
+/** Logo e ilustração da tela do ColorADD, também reduzidos (assets/coloradd/app). */
+export const logoColorAddVertical = require('../../assets/coloradd/app/logo_vertical_branco.png');
+export const sinteseColorAdd = require('../../assets/coloradd/app/sintese_branco.png');
+
+/**
+ * Baixa e guarda em cache todas as imagens do ColorADD enquanto a splash está
+ * na tela. No Expo Go cada imagem vem do Metro pela rede na primeira vez que
+ * aparece, e era isso que fazia os símbolos surgirem atrasados. Num build
+ * instalado elas já estão no app; o prefetch é inofensivo.
+ */
+export function preCarregarImagensColorAdd() {
+  const fontes = [
+    ...Object.values(symbolMap).map((symbol) => symbol.image),
+    logoColorAddVertical,
+    sinteseColorAdd,
+  ];
+
+  for (const fonte of fontes) {
+    const uri = Image.resolveAssetSource(fonte)?.uri;
+
+    if (uri?.startsWith('http')) {
+      Image.prefetch(uri).catch(() => {
+        // Sem cache, a imagem só carrega quando aparecer: nada a fazer.
+      });
+    }
+  }
 }

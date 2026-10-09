@@ -4,6 +4,7 @@ import { useFonts } from 'expo-font';
 import { SplashScreen } from './src/screens/SplashScreen';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { AuthProvider } from './src/contexts/AuthContext';
+import { preCarregarImagensColorAdd } from './src/utils/colorAddSymbols';
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -25,6 +26,11 @@ export default function App() {
   // pode ter a tipografia como ponto único de falha: melhor a fonte errada
   // do que tela nenhuma.
   const podeSeguir = fontsLoaded || Boolean(fontError);
+
+  // Aproveita a splash para deixar os símbolos ColorADD em cache.
+  useEffect(() => {
+    preCarregarImagensColorAdd();
+  }, []);
 
   useEffect(() => {
     if (fontError) {
