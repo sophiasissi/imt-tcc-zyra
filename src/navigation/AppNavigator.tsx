@@ -23,37 +23,34 @@ import { PermissionsScreen } from '../screens/PermissionsScreen';
 import { ChangePasswordScreen } from '../screens/ChangePasswordScreen';
 import { SplashScreen } from '../screens/SplashScreen';
 import { useAuth } from '../contexts/AuthContext';
+import { ColorAddScreen } from '../screens/ColorAddScreen';
+import { SobreColorAddScreen } from '../screens/SobreColorAddScreen';
+import { AcessibilidadeScreen } from '../screens/AcessibilidadeScreen';
+import { PoliticaPrivacidadeScreen } from '../screens/PoliticaPrivacidadeScreen';
+import { TermosUsoScreen } from '../screens/TermosUsoScreen';
+import { ExcluirContaScreen } from '../screens/ExcluirContaScreen';
 import { CameraColorDetectionScreen } from '../screens/CameraColorDetectionScreen';
 import { CapturedClothingScreen } from '../screens/CapturedClothingScreen';
 import { LookDetalheScreen } from '../screens/LookDetalheScreen';
 import { LookSalvo } from '../services/looksApi';
 import { TipoDeImagem } from '../utils/photoUpload';
 
-export type GeneroCadastro =
-  | 'MASCULINO'
-  | 'FEMININO'
-  | 'NAO_BINARIO'
-  | 'PREFIRO_NAO_DIZER';
+import { GeneroCadastro, TipoDaltonismoCadastro } from '../constants/perfil';
 
-export type TipoDaltonismoCadastro =
-  | 'PROTANOMALIA'
-  | 'PROTANOPIA'
-  | 'DEUTERANOMALIA'
-  | 'DEUTERANOPIA'
-  | 'TRITANOMALIA'
-  | 'TRITANOPIA'
-  | 'ACROMATOPSIA'
-  | 'NAO_SEI';
+// Definidos em constants/perfil; reexportados para as telas do cadastro.
+export type { GeneroCadastro, TipoDaltonismoCadastro };
 
 export type RootStackParamList = {
   Intro: undefined;
   RegisterStart: undefined;
-  RegisterBasicInfo: undefined;
+  /** Versão dos Termos marcada como aceita na RegisterStartScreen. */
+  RegisterBasicInfo: { versaoTermosAceita: string };
 
   RegisterPassword: {
     firstName: string;
     name: string;
     email: string;
+    versaoTermosAceita: string;
   };
 
   RegisterVerification: {
@@ -64,6 +61,8 @@ export type RootStackParamList = {
     name?: string;
     email: string;
     password: string;
+    /** Para o register-profile, se o perfil não tiver saído no signup. */
+    versaoTermosAceita?: string;
   };
 
   RegisterWelcome: {
@@ -93,6 +92,8 @@ export type RootStackParamList = {
     dataNascimento: string;
     genero?: GeneroCadastro;
     tipoDaltonismo?: TipoDaltonismoCadastro;
+    /** Marcou a autorização do dado de saúde (ConsentimentoSaude). */
+    consentimentoDadosSaude?: boolean;
   };
 
   // email: vem preenchido quando o cadastro descobre que o email já tem conta.
@@ -131,6 +132,19 @@ export type RootStackParamList = {
   ChangePassword: undefined;
 
   CameraColorDetection: undefined;
+
+  /** Explicação do código ColorADD, aberta pelo botão do topo da Home. */
+  ColorAdd: undefined;
+
+  /** Configurações > Acessibilidade. */
+  SobreColorAdd: undefined;
+  Acessibilidade: undefined;
+
+  /** Abertas também do cadastro, antes do login. */
+  PoliticaPrivacidade: undefined;
+  TermosUso: undefined;
+
+  ExcluirConta: undefined;
 
   LookDetalhe: {
     look: LookSalvo;
@@ -241,12 +255,31 @@ export function AppNavigator() {
           }}
         />
 
+        {/* Por cima da Home, que fica visível por trás do fundo escurecido. */}
+        <Stack.Screen
+          name="ColorAdd"
+          component={ColorAddScreen}
+          options={{
+            animation: 'fade',
+            presentation: 'transparentModal',
+            contentStyle: { backgroundColor: 'transparent' },
+          }}
+        />
+
         <Stack.Screen name="LookDetalhe" component={LookDetalheScreen} />
 
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
         <Stack.Screen name="Permissions" component={PermissionsScreen} />
         <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+        <Stack.Screen name="SobreColorAdd" component={SobreColorAddScreen} />
+        <Stack.Screen name="Acessibilidade" component={AcessibilidadeScreen} />
+        <Stack.Screen
+          name="PoliticaPrivacidade"
+          component={PoliticaPrivacidadeScreen}
+        />
+        <Stack.Screen name="TermosUso" component={TermosUsoScreen} />
+        <Stack.Screen name="ExcluirConta" component={ExcluirContaScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
