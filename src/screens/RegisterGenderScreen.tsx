@@ -7,19 +7,9 @@ import { AuthLayout } from '../components/AuthLayout';
 import { OptionPill } from '../components/OptionPill';
 import { ZyraButton } from '../components/ZyraButton';
 import { theme } from '../styles/theme';
+import { GENERO_OPCOES, GENERO_PREFIRO_NAO_DIZER } from '../constants/perfil';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterGender'>;
-
-type GenderOption = {
-  label: string;
-  value: GeneroCadastro;
-};
-
-const options: GenderOption[] = [
-  { label: 'Masculino', value: 'MASCULINO' },
-  { label: 'Feminino', value: 'FEMININO' },
-  { label: 'Não Binário', value: 'NAO_BINARIO' },
-];
 
 export function RegisterGenderScreen({ navigation, route }: Props) {
   const { dataNascimento } = route.params;
@@ -56,7 +46,7 @@ export function RegisterGenderScreen({ navigation, route }: Props) {
       footer={
         <View>
           <Text onPress={handleSkip} style={styles.skip}>
-            Prefiro não dizer
+            {GENERO_PREFIRO_NAO_DIZER}
           </Text>
 
           <ZyraButton
@@ -74,7 +64,7 @@ export function RegisterGenderScreen({ navigation, route }: Props) {
       </Text>
 
       <View style={styles.options}>
-        {options.map((option) => (
+        {GENERO_OPCOES.map((option) => (
           <OptionPill
             key={option.value}
             label={option.label}

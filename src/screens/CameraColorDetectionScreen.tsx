@@ -5,6 +5,7 @@ import {
   Animated,
   Image,
   ImageSourcePropType,
+  Linking,
   Platform,
   StyleSheet,
   Text,
@@ -407,6 +408,53 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
     setIsFlashOn((currentValue) => !currentValue);
   }
 
+  /**
+   * Pede a permissão das fotos antes de abrir a galeria (pedido da Sophia em
+   * 09/10/2026; o seletor do sistema funcionaria sem ela). No iOS, "acesso
+   * limitado" também vale: a pessoa escolhe as fotos que o app pode ver.
+   *
+   * Recusada de vez, só os Ajustes do celular liberam: o popup leva até lá.
+   */
+  async function garantirPermissaoGaleria() {
+    try {
+      let permissao = await ImagePicker.getMediaLibraryPermissionsAsync();
+
+      if (!permissao.granted && permissao.canAskAgain) {
+        permissao = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      }
+
+      if (permissao.granted) {
+        return true;
+      }
+
+      // O alerta do sistema ainda está fechando: um popup aberto junto com
+      // ele pode não aparecer no iOS.
+      if (Platform.OS === 'ios') await sleep(SELETOR_FECHANDO_MS);
+
+      setPopup({
+        variant: 'warning',
+        title: 'Permita o acesso às fotos',
+        message:
+          'Para cadastrar uma peça com uma foto que você já tem, libere o acesso às fotos do ZYRA nos Ajustes do celular.',
+        buttonText: 'Abrir Ajustes',
+        onConfirm: () => {
+          Linking.openSettings().catch((error: unknown) =>
+            console.error('[Câmera] Falha ao abrir os Ajustes:', error),
+          );
+        },
+        secondaryButtonText: 'Agora não',
+      });
+
+      return false;
+    } catch (error) {
+      console.error(
+        '[Câmera] Falha ao verificar a permissão das fotos:',
+        error,
+      );
+      return false;
+    }
+  }
+
   function handleConfirmPopup() {
     const onConfirm = popup?.onConfirm;
 
@@ -514,6 +562,11 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
     }
 
     isNaGaleriaRef.current = true;
+
+    if (!(await garantirPermissaoGaleria())) {
+      isNaGaleriaRef.current = false;
+      return;
+    }
 
     let escolha: ImagePicker.ImagePickerResult;
 
@@ -931,6 +984,9 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
         showCloseButton={false}
         customIcon={popup?.customIcon}
         onConfirm={handleConfirmPopup}
+        secondaryButtonText={popup?.secondaryButtonText}
+        onSecondaryPress={() => setPopup(null)}
+        secondaryVariant="botao"
       />
     </View>
   );

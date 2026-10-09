@@ -18,6 +18,8 @@ import { theme } from '../styles/theme';
 import { ZyraButton } from '../components/ZyraButton';
 import { ZyraInput } from '../components/ZyraInput';
 import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
+import { useAuth } from '../contexts/AuthContext';
+import { apiRequest } from '../services/api';
 
 import BackIcon from '../../assets/icons/backArrow.svg';
 import EyeClosedIcon from '../../assets/icons/eye-closed.svg';
@@ -33,6 +35,8 @@ type Rule = {
 };
 
 export function ChangePasswordScreen({ navigation }: Props) {
+  const { tokens } = useAuth();
+  const [isSaving, setIsSaving] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [currentPasswordTouched, setCurrentPasswordTouched] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -74,7 +78,7 @@ export function ChangePasswordScreen({ navigation }: Props) {
     confirmation.length > 0 && confirmation === newPassword;
 
   const canSubmit =
-    currentPasswordFilled && newPasswordIsValid && passwordsMatch;
+    currentPasswordFilled && newPasswordIsValid && passwordsMatch && !isSaving;
 
   const currentPasswordError =
     currentPasswordTouched && !currentPasswordFilled
@@ -109,7 +113,7 @@ export function ChangePasswordScreen({ navigation }: Props) {
     );
   }
 
-  function handleChangePassword() {
+  async function handleChangePassword() {
     Keyboard.dismiss();
 
     setCurrentPasswordTouched(true);
@@ -134,15 +138,70 @@ export function ChangePasswordScreen({ navigation }: Props) {
       return;
     }
 
-    console.log('[Alterar senha] Fluxo visual criado. Integração futura.');
+    if (newPassword === currentPassword) {
+      setPopup({
+        variant: 'warning',
+        title: 'Escolha outra senha',
+        message: 'A nova senha precisa ser diferente da senha atual.',
+        buttonText: 'Entendi',
+      });
 
-    setPopup({
-      variant: 'info',
-      title: 'Alteração de senha',
-      message:
-        'Essa tela já está pronta visualmente. Na próxima etapa, vamos integrar com o back para validar a senha atual e salvar a nova senha.',
-      buttonText: 'Entendi',
-    });
+      return;
+    }
+
+    const accessToken = tokens?.accessToken;
+
+    if (!accessToken) {
+      setPopup({
+        variant: 'warning',
+        title: 'Sessão não encontrada',
+        message: 'Entre novamente para alterar sua senha.',
+        buttonText: 'Entendi',
+      });
+
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+
+      // POST /auth/change-password: troca no Cognito. Senha atual errada
+      // volta como 400 ("A senha atual está incorreta."), e não 401, para o
+      // app não confundir com sessão vencida.
+      await apiRequest('/auth/change-password', {
+        method: 'POST',
+        token: accessToken,
+        body: JSON.stringify({
+          senhaAtual: currentPassword,
+          novaSenha: newPassword,
+        }),
+      });
+
+      setPopup({
+        variant: 'success',
+        title: 'Senha alterada',
+        message: 'Use a nova senha na próxima vez que entrar no ZYRA.',
+        buttonText: 'Concluir',
+        onConfirm: () => {
+          setPopup(null);
+          navigation.goBack();
+        },
+      });
+    } catch (error) {
+      console.error('[Alterar senha] Falha ao alterar:', error);
+
+      setPopup({
+        variant: 'error',
+        title: 'Não foi possível alterar a senha',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Tente novamente em alguns instantes.',
+        buttonText: 'Entendi',
+      });
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   function handleForgotPassword() {
@@ -270,7 +329,7 @@ export function ChangePasswordScreen({ navigation }: Props) {
 
             <View style={styles.footer}>
               <ZyraButton
-                title="Alterar Senha"
+                title={isSaving ? 'Alterando...' : 'Alterar senha'}
                 disabled={!canSubmit}
                 onPress={handleChangePassword}
               />
@@ -278,8 +337,12 @@ export function ChangePasswordScreen({ navigation }: Props) {
           </ScrollView>
 
           {popup ? (
+            // Camada, e não Modal: o popup de sucesso some junto com a volta
+            // de tela, o que no iOS pode deixar um Modal invisível travando
+            // os toques (ver ZyraPopup).
             <ZyraPopup
               visible
+              modal={false}
               {...popup}
               onConfirm={popup.onConfirm ?? closePopup}
               onClose={closePopup}

@@ -17,7 +17,8 @@ type VerificarEmailResponse = {
   disponivel: boolean;
 };
 
-export function RegisterBasicInfoScreen({ navigation }: Props) {
+export function RegisterBasicInfoScreen({ navigation, route }: Props) {
+  const { versaoTermosAceita } = route.params;
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [nameTouched, setNameTouched] = useState(false);
@@ -97,6 +98,7 @@ export function RegisterBasicInfoScreen({ navigation }: Props) {
       firstName,
       name: trimmedName,
       email: trimmedEmail,
+      versaoTermosAceita,
     });
   }
 

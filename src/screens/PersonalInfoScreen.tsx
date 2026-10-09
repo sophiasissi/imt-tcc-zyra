@@ -1,110 +1,138 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import Svg, { Path } from 'react-native-svg';
 
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { theme } from '../styles/theme';
-import { apiRequest } from '../services/api';
+import { ApiError, apiRequest } from '../services/api';
+import { EscalaDificuldade } from '../components/EscalaDificuldade';
 import { ZyraButton } from '../components/ZyraButton';
 import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
-import { useAuth } from '../contexts/AuthContext';
+import { ConsentimentoSaude } from '../components/ConsentimentoSaude';
+import { UserProfile, useAuth } from '../contexts/AuthContext';
+import {
+  DALTONISMO_PREFIRO_NAO_DIZER,
+  exigeConsentimentoSaude,
+  DALTONISMO_OPCOES,
+  DIFICULDADE_PREFIRO_NAO_DIZER,
+  GENERO_OPCOES,
+  GENERO_PREFIRO_NAO_DIZER,
+  daltonismoLabel,
+  generoLabel,
+} from '../constants/perfil';
 
 import BackIcon from '../../assets/icons/backArrow.svg';
 import ArrowRightIcon from '../../assets/icons/right-arrow-svgrepo-com.svg';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PersonalInfo'>;
 
-type UserProfileResponse = {
-  id: string;
-  cognitoSub: string;
-  nome: string | null;
-  email: string | null;
-  dataNascimento: string | null;
-  genero: GeneroValue | null;
-  tipoDaltonismo: TipoDaltonismoValue | null;
-  nivelDificuldadeLooks: number | null;
+/**
+ * Nome, e-mail e data de nascimento são só leitura: o e-mail é o login, e o
+ * nome e a data não mudam (decisão de 08/10/2026).
+ */
+type EditableField = 'genero' | 'tipoDaltonismo' | 'nivelDificuldadeLooks';
+
+/**
+ * Opção do editor. `chave` identifica a opção na tela; `valor` é o que vai
+ * para o back (null no "Prefiro não dizer" da dificuldade, que no cadastro
+ * também deixa o campo vazio).
+ */
+type Opcao = {
+  chave: string;
+  label: string;
+  valor: string | number | null;
 };
 
-type GeneroValue =
-  | 'MASCULINO'
-  | 'FEMININO'
-  | 'NAO_BINARIO'
-  | 'PREFIRO_NAO_DIZER'
-  | 'OUTRO';
+const CHAVE_VAZIO = 'VAZIO';
 
-type TipoDaltonismoValue =
-  | 'PROTANOMALIA'
-  | 'PROTANOPIA'
-  | 'DEUTERANOMALIA'
-  | 'DEUTERANOPIA'
-  | 'TRITANOMALIA'
-  | 'TRITANOPIA'
-  | 'ACROMATOPSIA'
-  | 'NAO_SEI'
-  | 'PREFIRO_NAO_DIZER';
-
-type EditableField = 'dataNascimento' | 'genero' | 'tipoDaltonismo';
-
-type InfoRowProps = {
-  label: string;
-  value: string;
-  onPress?: () => void;
+const OPCOES: Record<EditableField, Opcao[]> = {
+  genero: [
+    ...GENERO_OPCOES.map(({ label, value }) => ({
+      chave: value,
+      label,
+      valor: value,
+    })),
+    {
+      chave: 'PREFIRO_NAO_DIZER',
+      label: GENERO_PREFIRO_NAO_DIZER,
+      valor: 'PREFIRO_NAO_DIZER',
+    },
+  ],
+  tipoDaltonismo: [
+    ...DALTONISMO_OPCOES.map(({ label, value }) => ({
+      chave: value,
+      label,
+      valor: value,
+    })),
+    {
+      chave: 'PREFIRO_NAO_DIZER',
+      label: DALTONISMO_PREFIRO_NAO_DIZER,
+      valor: 'PREFIRO_NAO_DIZER',
+    },
+  ],
+  // Os números ficam na escala; aqui só a opção de não responder.
+  nivelDificuldadeLooks: [
+    { chave: CHAVE_VAZIO, label: DIFICULDADE_PREFIRO_NAO_DIZER, valor: null },
+  ],
 };
 
-const generoOptions: { label: string; value: GeneroValue }[] = [
-  { label: 'Masculino', value: 'MASCULINO' },
-  { label: 'Feminino', value: 'FEMININO' },
-  { label: 'Não binário', value: 'NAO_BINARIO' },
-  { label: 'Outro', value: 'OUTRO' },
-  { label: 'Prefiro não dizer', value: 'PREFIRO_NAO_DIZER' },
-];
+const EDITOR_TITULO: Record<EditableField, string> = {
+  genero: 'Como você se identifica?',
+  tipoDaltonismo: 'Qual tipo de daltonismo você tem?',
+  nivelDificuldadeLooks: 'Quanta dificuldade você sente ao combinar roupas?',
+};
 
-const daltonismoOptions: {
-  label: string;
-  value: TipoDaltonismoValue;
-}[] = [
-  { label: 'Protanomalia', value: 'PROTANOMALIA' },
-  { label: 'Protanopia', value: 'PROTANOPIA' },
-  { label: 'Deuteranomalia', value: 'DEUTERANOMALIA' },
-  { label: 'Deuteranopia', value: 'DEUTERANOPIA' },
-  { label: 'Tritanomalia', value: 'TRITANOMALIA' },
-  { label: 'Tritanopia', value: 'TRITANOPIA' },
-  { label: 'Acromatopsia', value: 'ACROMATOPSIA' },
-  { label: 'Não sei', value: 'NAO_SEI' },
-  { label: 'Prefiro não dizer', value: 'PREFIRO_NAO_DIZER' },
-];
+/**
+ * O cadastro só termina depois da data de nascimento, que é obrigatória.
+ * Com ela salva, a dificuldade vazia é a resposta "Prefiro não dizer"; sem
+ * ela, a pessoa ainda não respondeu.
+ */
+function cadastroConcluido(profile: UserProfile | null) {
+  return Boolean(profile?.dataNascimento);
+}
 
-function InfoRow({ label, value, onPress }: InfoRowProps) {
-  return (
-    <TouchableOpacity
-      accessibilityRole={onPress ? 'button' : 'text'}
-      accessibilityLabel={`${label}: ${value}`}
-      activeOpacity={onPress ? 0.75 : 1}
-      style={styles.infoRow}
-      onPress={onPress}
-      disabled={!onPress}
-    >
-      <Text style={styles.infoLabel}>{label}</Text>
+/** Chave da opção que corresponde ao valor salvo. */
+function chaveAtual(field: EditableField, profile: UserProfile | null) {
+  const valor = profile?.[field];
 
-      <View style={styles.infoValueArea}>
-        <Text style={styles.infoValue}>{value}</Text>
-        {onPress ? <ArrowRightIcon width={14} height={14} /> : null}
-      </View>
-    </TouchableOpacity>
-  );
+  if (valor !== null && valor !== undefined) {
+    return String(valor);
+  }
+
+  return field === 'nivelDificuldadeLooks' && cadastroConcluido(profile)
+    ? CHAVE_VAZIO
+    : null;
+}
+
+function valorExibido(field: EditableField, profile: UserProfile | null) {
+  if (field === 'genero') {
+    return generoLabel(profile?.genero) ?? 'Não informado';
+  }
+
+  if (field === 'tipoDaltonismo') {
+    return daltonismoLabel(profile?.tipoDaltonismo) ?? 'Não informado';
+  }
+
+  const nivel = profile?.nivelDificuldadeLooks;
+
+  if (nivel !== null && nivel !== undefined) {
+    return `${nivel} de 5`;
+  }
+
+  return cadastroConcluido(profile)
+    ? DIFICULDADE_PREFIRO_NAO_DIZER
+    : 'Não informado';
 }
 
 function formatDateToDisplay(value?: string | null) {
@@ -122,32 +150,99 @@ function formatDateToDisplay(value?: string | null) {
   return `${day}/${month}/${year}`;
 }
 
-function formatDateToApi(value: string) {
-  const cleanValue = value.trim();
+type InfoRowProps = {
+  label: string;
+  value: string;
+  onPress?: () => void;
+  /** E-mail longo: corta no meio, mantendo o começo e o domínio. */
+  umaLinha?: boolean;
+};
 
-  if (/^\d{4}-\d{2}-\d{2}$/.test(cleanValue)) {
-    return cleanValue;
+function InfoRow({ label, value, onPress, umaLinha = false }: InfoRowProps) {
+  const conteudo = (
+    <>
+      <Text style={styles.infoLabel}>{label}</Text>
+
+      <View style={styles.infoValueArea}>
+        <Text
+          style={styles.infoValue}
+          numberOfLines={umaLinha ? 1 : 2}
+          ellipsizeMode={umaLinha ? 'middle' : 'tail'}
+        >
+          {value}
+        </Text>
+        {onPress ? <ArrowRightIcon width={14} height={14} /> : null}
+      </View>
+    </>
+  );
+
+  if (!onPress) {
+    return (
+      <View
+        style={styles.infoRow}
+        accessible
+        accessibilityLabel={`${label}: ${value}`}
+      >
+        {conteudo}
+      </View>
+    );
   }
 
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(cleanValue)) {
-    const [day, month, year] = cleanValue.split('/');
-    return `${year}-${month}-${day}`;
-  }
-
-  return cleanValue;
-}
-
-function getGeneroLabel(value?: GeneroValue | null) {
   return (
-    generoOptions.find((option) => option.value === value)?.label ??
-    'Não informado'
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityLabel={`${label}: ${value}`}
+      accessibilityHint="Toque para alterar"
+      activeOpacity={0.75}
+      style={styles.infoRow}
+      onPress={onPress}
+    >
+      {conteudo}
+    </TouchableOpacity>
   );
 }
 
-function getDaltonismoLabel(value?: TipoDaltonismoValue | null) {
+/**
+ * O destaque rosa é a escolha em edição; o ✓ marca a opção salva e só muda
+ * depois de salvar. Assim a pessoa vê o que tinha antes enquanto escolhe.
+ */
+function OpcaoItem({
+  label,
+  selected,
+  salva,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  salva: boolean;
+  onPress: () => void;
+}) {
   return (
-    daltonismoOptions.find((option) => option.value === value)?.label ??
-    'Não informado'
+    <TouchableOpacity
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      accessibilityLabel={salva ? `${label}, opção salva` : label}
+      activeOpacity={0.8}
+      style={[styles.optionItem, selected && styles.optionItemSelected]}
+      onPress={onPress}
+    >
+      <Text style={[styles.optionText, selected && styles.optionTextSelected]}>
+        {label}
+      </Text>
+
+      {salva ? (
+        <Svg width={18} height={18} viewBox="0 0 24 24">
+          <Path
+            d="M5 12.5l4.5 4.5L19 7.5"
+            stroke={selected ? theme.colors.white : theme.colors.primary}
+            strokeWidth={2.8}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        </Svg>
+      ) : null}
+    </TouchableOpacity>
   );
 }
 
@@ -156,157 +251,147 @@ export function PersonalInfoScreen({ navigation }: Props) {
 
   const accessToken = tokens?.accessToken ?? '';
 
-  const [profile, setProfile] = useState<UserProfileResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Abre com o perfil que já está em memória e atualiza por trás; o
+  // carregando só aparece se ainda não houver nada para mostrar.
+  const [profile, setProfile] = useState<UserProfile | null>(user);
+  const [isLoading, setIsLoading] = useState(!user);
   const [isSaving, setIsSaving] = useState(false);
   const [activeField, setActiveField] = useState<EditableField | null>(null);
-  const [draftValue, setDraftValue] = useState('');
+  const [draftKey, setDraftKey] = useState<string | null>(null);
   const [popup, setPopup] = useState<ZyraPopupConfig | null>(null);
+  const [consentiu, setConsentiu] = useState(false);
 
-  const displayName = profile?.nome ?? user?.nome ?? 'Nome do Usuário';
+  const temPerfilEmMemoria = Boolean(user);
 
   useEffect(() => {
-    async function loadProfile() {
-      try {
-        setIsLoading(true);
+    let ativo = true;
 
-        if (!accessToken) {
+    async function loadProfile() {
+      if (!accessToken) {
+        if (ativo && !temPerfilEmMemoria) {
           setPopup({
             variant: 'warning',
             title: 'Sessão não encontrada',
             message: 'Entre novamente para visualizar suas informações.',
             buttonText: 'Entendi',
           });
-
           setIsLoading(false);
-          return;
         }
 
-        const response = await apiRequest<UserProfileResponse>('/users/me', {
+        return;
+      }
+
+      try {
+        const response = await apiRequest<UserProfile>('/users/me', {
           method: 'GET',
           token: accessToken,
         });
 
+        if (!ativo) return;
+
         setProfile(response);
         updateUser(response);
       } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : 'Não foi possível carregar suas informações.';
+        console.error('[Informações pessoais] Falha ao carregar:', error);
 
-        setPopup({
-          variant: 'error',
-          title: 'Não foi possível carregar seus dados',
-          message,
-          buttonText: 'Entendi',
-        });
+        // Com o perfil em memória na tela, a falha da atualização não
+        // atrapalha: a pessoa continua vendo seus dados.
+        if (ativo && !temPerfilEmMemoria) {
+          setPopup({
+            variant: 'error',
+            title: 'Não foi possível carregar seus dados',
+            message:
+              error instanceof Error
+                ? error.message
+                : 'Não foi possível carregar suas informações.',
+            buttonText: 'Entendi',
+          });
+        }
       } finally {
-        setIsLoading(false);
+        if (ativo) setIsLoading(false);
       }
     }
 
     void loadProfile();
-  }, [accessToken, updateUser]);
+
+    return () => {
+      ativo = false;
+    };
+  }, [accessToken, updateUser, temPerfilEmMemoria]);
 
   function closePopup() {
     setPopup(null);
   }
 
   function openEditor(field: EditableField) {
+    setConsentiu(false);
     setActiveField(field);
-
-    if (field === 'dataNascimento') {
-      setDraftValue(formatDateToDisplay(profile?.dataNascimento));
-      return;
-    }
-
-    if (field === 'genero') {
-      setDraftValue(profile?.genero ?? '');
-      return;
-    }
-
-    if (field === 'tipoDaltonismo') {
-      setDraftValue(profile?.tipoDaltonismo ?? '');
-    }
+    setDraftKey(chaveAtual(field, profile));
   }
 
   function closeEditor() {
+    if (isSaving) return;
+
     setActiveField(null);
-    setDraftValue('');
-  }
-
-  async function updateProfile(
-    payload: Partial<
-      Pick<UserProfileResponse, 'dataNascimento' | 'genero' | 'tipoDaltonismo'>
-    >,
-  ) {
-    const response = await apiRequest<UserProfileResponse>('/users/me', {
-      method: 'PATCH',
-      token: accessToken,
-      body: JSON.stringify(payload),
-    });
-
-    setProfile(response);
-    updateUser(response);
+    setDraftKey(null);
   }
 
   async function handleSave() {
-    if (!activeField) {
+    if (!activeField || draftKey === null) {
       return;
     }
+
+    // Nada mudou: fecha sem chamar o back.
+    if (draftKey === chaveAtual(activeField, profile)) {
+      closeEditor();
+      return;
+    }
+
+    if (precisaConsentimento && !consentiu) {
+      return;
+    }
+
+    const valor =
+      activeField === 'nivelDificuldadeLooks' && draftKey !== CHAVE_VAZIO
+        ? Number(draftKey)
+        : (OPCOES[activeField].find((opcao) => opcao.chave === draftKey)
+            ?.valor ?? null);
 
     try {
       setIsSaving(true);
 
-      if (activeField === 'dataNascimento') {
-        const formattedDate = formatDateToApi(draftValue);
+      const response = await apiRequest<UserProfile>('/users/me', {
+        method: 'PATCH',
+        token: accessToken,
+        // null limpa o campo no back (o DTO aceita, por ser opcional).
+        body: JSON.stringify({
+          [activeField]: valor,
+          ...(precisaConsentimento ? { consentimentoDadosSaude: true } : {}),
+        }),
+      });
 
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(formattedDate)) {
-          setPopup({
-            variant: 'warning',
-            title: 'Data inválida',
-            message: 'Digite a data no formato DD/MM/AAAA.',
-            buttonText: 'Entendi',
-          });
-
-          return;
-        }
-
-        await updateProfile({
-          dataNascimento: formattedDate,
-        });
-
-        closeEditor();
-        return;
-      }
-
-      if (activeField === 'genero') {
-        await updateProfile({
-          genero: draftValue as GeneroValue,
-        });
-
-        closeEditor();
-        return;
-      }
-
-      if (activeField === 'tipoDaltonismo') {
-        await updateProfile({
-          tipoDaltonismo: draftValue as TipoDaltonismoValue,
-        });
-
-        closeEditor();
-      }
+      setProfile(response);
+      updateUser(response);
+      setActiveField(null);
+      setDraftKey(null);
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Não foi possível salvar a alteração.';
+      console.error('[Informações pessoais] Falha ao salvar:', error);
+
+      // 400 do validador do back vem em inglês (ex.: back sem a migration do
+      // NAO_TENHO) e não serve para a pessoa. Os 400 escritos pelo back, em
+      // português (ex.: falta de autorização), passam como vieram.
+      const doValidador =
+        error instanceof ApiError &&
+        error.status === 400 &&
+        /\b(must|should|property)\b/i.test(error.message);
 
       setPopup({
         variant: 'error',
         title: 'Não foi possível salvar',
-        message,
+        message:
+          !doValidador && error instanceof Error
+            ? error.message
+            : 'Não foi possível salvar essa alteração agora. Tente novamente mais tarde.',
         buttonText: 'Entendi',
       });
     } finally {
@@ -314,13 +399,20 @@ export function PersonalInfoScreen({ navigation }: Props) {
     }
   }
 
-  function getEditorTitle() {
-    if (activeField === 'dataNascimento') return 'Alterar data de nascimento';
-    if (activeField === 'genero') return 'Alterar gênero';
-    if (activeField === 'tipoDaltonismo') return 'Alterar tipo de daltonismo';
+  // Tipo de daltonismo é dado de saúde: sem autorização salva, a escolha de
+  // qualquer tipo (menos "Prefiro não dizer") pede a autorização antes.
+  const precisaConsentimento =
+    activeField === 'tipoDaltonismo' &&
+    !profile?.consentimentoSaudeEm &&
+    draftKey !== chaveAtual('tipoDaltonismo', profile) &&
+    exigeConsentimentoSaude(draftKey);
 
-    return '';
-  }
+  const nivelSelecionado =
+    activeField === 'nivelDificuldadeLooks' &&
+    draftKey !== null &&
+    draftKey !== CHAVE_VAZIO
+      ? Number(draftKey)
+      : null;
 
   return (
     <View style={styles.screen}>
@@ -340,7 +432,9 @@ export function PersonalInfoScreen({ navigation }: Props) {
           <BackIcon width={26} height={26} />
         </TouchableOpacity>
 
-        <Text style={styles.title}>Informações Pessoais</Text>
+        <Text style={styles.title} accessibilityRole="header">
+          Informações pessoais
+        </Text>
 
         <View style={styles.headerSpacer} />
       </View>
@@ -352,26 +446,35 @@ export function PersonalInfoScreen({ navigation }: Props) {
         </View>
       ) : (
         <View style={styles.content}>
-          <InfoRow label="Nome" value={displayName} />
+          <InfoRow label="Nome" value={profile?.nome ?? 'Não informado'} />
 
-          <InfoRow label="E-mail" value={profile?.email ?? 'Não informado'} />
+          <InfoRow
+            label="E-mail"
+            value={profile?.email ?? 'Não informado'}
+            umaLinha
+          />
 
           <InfoRow
             label="Data de nascimento"
             value={formatDateToDisplay(profile?.dataNascimento)}
-            onPress={() => openEditor('dataNascimento')}
           />
 
           <InfoRow
             label="Gênero"
-            value={getGeneroLabel(profile?.genero)}
+            value={valorExibido('genero', profile)}
             onPress={() => openEditor('genero')}
           />
 
           <InfoRow
             label="Tipo de daltonismo"
-            value={getDaltonismoLabel(profile?.tipoDaltonismo)}
+            value={valorExibido('tipoDaltonismo', profile)}
             onPress={() => openEditor('tipoDaltonismo')}
+          />
+
+          <InfoRow
+            label="Dificuldade para combinar roupas"
+            value={valorExibido('nivelDificuldadeLooks', profile)}
+            onPress={() => openEditor('nivelDificuldadeLooks')}
           />
         </View>
       )}
@@ -382,114 +485,100 @@ export function PersonalInfoScreen({ navigation }: Props) {
         animationType="fade"
         onRequestClose={closeEditor}
       >
-        <KeyboardAvoidingView
-          style={styles.editorKeyboardView}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <View style={styles.editorOverlay}>
-            <Pressable style={styles.editorBackdrop} onPress={closeEditor} />
+        <View style={styles.editorOverlay}>
+          <Pressable
+            style={styles.editorBackdrop}
+            onPress={closeEditor}
+            accessibilityRole="button"
+            accessibilityLabel="Fechar edição"
+          />
 
-            <View style={styles.editorSheet}>
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel="Fechar edição"
-                activeOpacity={0.8}
-                style={styles.editorCloseButton}
-                onPress={closeEditor}
+          <View style={styles.editorSheet}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Fechar edição"
+              activeOpacity={0.8}
+              style={styles.editorCloseButton}
+              onPress={closeEditor}
+            >
+              <Text style={styles.editorCloseText}>×</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.editorTitle} accessibilityRole="header">
+              {activeField ? EDITOR_TITULO[activeField] : ''}
+            </Text>
+
+            {activeField === 'nivelDificuldadeLooks' ? (
+              <View style={styles.scaleArea}>
+                <EscalaDificuldade
+                  selected={nivelSelecionado}
+                  salvo={profile?.nivelDificuldadeLooks ?? null}
+                  onSelect={(nivel) => setDraftKey(String(nivel))}
+                  disabled={isSaving}
+                />
+              </View>
+            ) : null}
+
+            {activeField ? (
+              <ScrollView
+                style={styles.optionsList}
+                accessibilityRole="radiogroup"
               >
-                <Text style={styles.editorCloseText}>×</Text>
-              </TouchableOpacity>
-
-              <Text style={styles.editorTitle}>{getEditorTitle()}</Text>
-
-              {activeField === 'dataNascimento' ? (
-                <>
-                  <TextInput
-                    accessibilityLabel={getEditorTitle()}
-                    value={draftValue}
-                    onChangeText={setDraftValue}
-                    placeholder="DD/MM/AAAA"
-                    placeholderTextColor={theme.colors.muted2}
-                    keyboardType="number-pad"
-                    style={styles.editorInput}
+                {OPCOES[activeField].map((opcao) => (
+                  <OpcaoItem
+                    key={opcao.chave}
+                    label={opcao.label}
+                    selected={draftKey === opcao.chave}
+                    salva={
+                      activeField !== null &&
+                      chaveAtual(activeField, profile) === opcao.chave
+                    }
+                    onPress={() => setDraftKey(opcao.chave)}
                   />
+                ))}
+              </ScrollView>
+            ) : null}
 
-                  <Text style={styles.editorHint}>
-                    Use o formato DD/MM/AAAA.
-                  </Text>
-                </>
-              ) : null}
+            {precisaConsentimento ? (
+              <View style={styles.consentimento}>
+                <ConsentimentoSaude
+                  aceito={consentiu}
+                  onChange={setConsentiu}
+                  onVerPolitica={() => {
+                    closeEditor();
+                    navigation.navigate('PoliticaPrivacidade');
+                  }}
+                />
+              </View>
+            ) : null}
 
-              {activeField === 'genero' ? (
-                <ScrollView style={styles.optionsList}>
-                  {generoOptions.map((option) => (
-                    <TouchableOpacity
-                      key={option.value}
-                      accessibilityRole="button"
-                      accessibilityLabel={option.label}
-                      activeOpacity={0.8}
-                      style={[
-                        styles.optionItem,
-                        draftValue === option.value &&
-                          styles.optionItemSelected,
-                      ]}
-                      onPress={() => setDraftValue(option.value)}
-                    >
-                      <Text
-                        style={[
-                          styles.optionText,
-                          draftValue === option.value &&
-                            styles.optionTextSelected,
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              ) : null}
-
-              {activeField === 'tipoDaltonismo' ? (
-                <ScrollView style={styles.optionsList}>
-                  {daltonismoOptions.map((option) => (
-                    <TouchableOpacity
-                      key={option.value}
-                      accessibilityRole="button"
-                      accessibilityLabel={option.label}
-                      activeOpacity={0.8}
-                      style={[
-                        styles.optionItem,
-                        draftValue === option.value &&
-                          styles.optionItemSelected,
-                      ]}
-                      onPress={() => setDraftValue(option.value)}
-                    >
-                      <Text
-                        style={[
-                          styles.optionText,
-                          draftValue === option.value &&
-                            styles.optionTextSelected,
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              ) : null}
-
-              <ZyraButton
-                title={isSaving ? 'Salvando...' : 'Continuar'}
-                disabled={isSaving || draftValue.trim().length === 0}
-                onPress={handleSave}
-                style={styles.saveButton}
-              />
-            </View>
+            <ZyraButton
+              title={isSaving ? 'Salvando...' : 'Salvar'}
+              disabled={
+                isSaving ||
+                draftKey === null ||
+                (precisaConsentimento && !consentiu)
+              }
+              onPress={handleSave}
+              style={styles.saveButton}
+            />
           </View>
-        </KeyboardAvoidingView>
+
+          {/* Erro ao salvar: desenhado dentro do Modal do editor, como
+              camada, e não como um segundo Modal por cima dele. */}
+          {popup && activeField ? (
+            <ZyraPopup
+              visible
+              modal={false}
+              {...popup}
+              onConfirm={popup.onConfirm ?? closePopup}
+              onClose={closePopup}
+            />
+          ) : null}
+        </View>
       </Modal>
 
-      {popup ? (
+      {popup && !activeField ? (
         <ZyraPopup
           visible
           {...popup}
@@ -544,13 +633,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   infoRow: {
-    height: 52,
+    minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 16,
     marginBottom: 10,
   },
   infoLabel: {
+    flexShrink: 1,
     color: theme.colors.titleZyra,
     fontFamily: theme.fonts.medium,
     fontSize: 14,
@@ -562,13 +653,11 @@ const styles = StyleSheet.create({
     maxWidth: '56%',
   },
   infoValue: {
+    flexShrink: 1,
     color: theme.colors.muted,
     fontFamily: theme.fonts.regular,
     fontSize: 13,
     textAlign: 'right',
-  },
-  editorKeyboardView: {
-    flex: 1,
   },
   editorOverlay: {
     flex: 1,
@@ -600,31 +689,13 @@ const styles = StyleSheet.create({
   },
   editorTitle: {
     color: theme.colors.title,
-    fontFamily: theme.fonts.medium,
-    fontSize: 14,
+    fontFamily: theme.fonts.semiBold,
+    fontSize: 15,
     textAlign: 'center',
+    marginHorizontal: 28,
     marginBottom: 24,
   },
-  editorInput: {
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: theme.colors.input,
-    paddingHorizontal: 16,
-    color: theme.colors.text,
-    fontFamily: theme.fonts.medium,
-    fontSize: 14,
-    shadowColor: '#000000',
-    shadowOffset: { width: 2, height: 3 },
-    shadowOpacity: 0.18,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  editorHint: {
-    color: theme.colors.muted,
-    fontFamily: theme.fonts.regular,
-    fontSize: 11,
-    textAlign: 'center',
-    marginTop: 8,
+  scaleArea: {
     marginBottom: 22,
   },
   optionsList: {
@@ -636,7 +707,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: theme.colors.input,
     paddingHorizontal: 16,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
   optionItemSelected: {
@@ -650,6 +723,9 @@ const styles = StyleSheet.create({
   optionTextSelected: {
     color: theme.colors.white,
     fontFamily: theme.fonts.bold,
+  },
+  consentimento: {
+    marginBottom: 12,
   },
   saveButton: {
     marginTop: 8,

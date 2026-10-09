@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import GoogleIcon from '../../assets/icons/googleColor.svg';
@@ -6,10 +7,16 @@ import EmailIcon from '../../assets/icons/email.svg';
 import { AuthLayout } from '../components/AuthLayout';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { theme } from '../styles/theme';
+import { CaixaMarcacao } from '../components/CaixaMarcacao';
+import { VERSAO_TERMOS } from '../constants/termos';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterStart'>;
 
 export function RegisterStartScreen({ navigation }: Props) {
+  // Aceite dos Termos (clickwrap): a conta só é criada com ele, e o back
+  // guarda quando e qual versão foi aceita. A Política é para ler: ela
+  // informa (LGPD, art. 9º), não pede consentimento.
+  const [aceitou, setAceitou] = useState(false);
   return (
     <AuthLayout
       rolavel={false}
@@ -23,16 +30,39 @@ export function RegisterStartScreen({ navigation }: Props) {
       </View>
       <Text style={styles.welcome}>Bem vindo(a) ao</Text>
       <Text style={styles.brand}>ZYRA</Text>
-      <Text style={styles.legal}>
-        Ao criar uma conta, você declara que concorda com os{`\n`}
-        nossos <Text style={styles.underline}>Termos</Text> e que leu a nossa{' '}
-        <Text style={styles.underline}>Política de Privacidade</Text>
-      </Text>
+      <View style={styles.aceite}>
+        <CaixaMarcacao
+          marcada={aceitou}
+          onChange={setAceitou}
+          accessibilityLabel="Li e aceito os Termos de uso e a Política de privacidade"
+        >
+          <Text style={styles.legal} onPress={() => setAceitou(!aceitou)}>
+            Li e aceito os{' '}
+            <Text
+              accessibilityRole="link"
+              style={styles.underline}
+              onPress={() => navigation.navigate('TermosUso')}
+            >
+              Termos de uso
+            </Text>{' '}
+            e a{' '}
+            <Text
+              accessibilityRole="link"
+              style={styles.underline}
+              onPress={() => navigation.navigate('PoliticaPrivacidade')}
+            >
+              Política de privacidade
+            </Text>
+          </Text>
+        </CaixaMarcacao>
+      </View>
 
       <TouchableOpacity
         accessibilityRole="button"
         activeOpacity={0.84}
-        style={styles.secondaryButton}
+        accessibilityState={{ disabled: !aceitou }}
+        style={[styles.secondaryButton, !aceitou && styles.desativado]}
+        disabled={!aceitou}
         onPress={() =>
           navigation.navigate('RegisterWelcome', { firstName: 'username' })
         }
@@ -44,8 +74,14 @@ export function RegisterStartScreen({ navigation }: Props) {
       <TouchableOpacity
         accessibilityRole="button"
         activeOpacity={0.84}
-        style={styles.secondaryButton}
-        onPress={() => navigation.navigate('RegisterBasicInfo')}
+        accessibilityState={{ disabled: !aceitou }}
+        style={[styles.secondaryButton, !aceitou && styles.desativado]}
+        disabled={!aceitou}
+        onPress={() =>
+          navigation.navigate('RegisterBasicInfo', {
+            versaoTermosAceita: VERSAO_TERMOS,
+          })
+        }
       >
         <EmailIcon width={20} height={20} />
         <Text style={styles.secondaryText}>Começar com Email</Text>
@@ -81,13 +117,18 @@ const styles = StyleSheet.create({
     fontSize: 24,
     marginBottom: 20,
   },
+  aceite: {
+    width: '100%',
+    marginBottom: 22,
+  },
   legal: {
-    color: theme.colors.muted,
+    color: theme.colors.text,
     fontFamily: theme.fonts.regular,
-    fontSize: 11,
-    lineHeight: 17,
-    textAlign: 'center',
-    marginBottom: 29,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  desativado: {
+    opacity: 0.5,
   },
   underline: {
     textDecorationLine: 'underline',

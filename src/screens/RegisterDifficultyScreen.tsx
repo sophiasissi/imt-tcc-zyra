@@ -1,34 +1,24 @@
 import { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { AuthLayout } from '../components/AuthLayout';
+import { EscalaDificuldade } from '../components/EscalaDificuldade';
 import { ZyraButton } from '../components/ZyraButton';
 import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
 import { apiRequest } from '../services/api';
 import { theme } from '../styles/theme';
-import { useAuth } from '../contexts/AuthContext';
+import { UserProfile, useAuth } from '../contexts/AuthContext';
+import { DIFICULDADE_PREFIRO_NAO_DIZER } from '../constants/perfil';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterDifficulty'>;
-
-type UpdateProfileResponse = {
-  id: string;
-  cognitoSub: string;
-  nome: string | null;
-  email: string | null;
-  dataNascimento: string | null;
-  genero: string | null;
-  tipoDaltonismo: string | null;
-  nivelDificuldadeLooks: number | null;
-};
-
-const numbers = [0, 1, 2, 3, 4, 5];
 
 export function RegisterDifficultyScreen({ navigation, route }: Props) {
   const { tokens, updateUser } = useAuth();
 
-  const { dataNascimento, genero, tipoDaltonismo } = route.params;
+  const { dataNascimento, genero, tipoDaltonismo, consentimentoDadosSaude } =
+    route.params;
   const accessToken = tokens?.accessToken ?? '';
 
   const [selected, setSelected] = useState<number | null>(null);
@@ -58,6 +48,7 @@ export function RegisterDifficultyScreen({ navigation, route }: Props) {
       dataNascimento,
       ...(genero ? { genero } : {}),
       ...(tipoDaltonismo ? { tipoDaltonismo } : {}),
+      ...(consentimentoDadosSaude ? { consentimentoDadosSaude: true } : {}),
       ...(nivelDificuldadeLooks !== undefined ? { nivelDificuldadeLooks } : {}),
     };
 
@@ -66,7 +57,7 @@ export function RegisterDifficultyScreen({ navigation, route }: Props) {
 
       console.log('[Onboarding] Enviando dados complementares para o banco...');
 
-      const response = await apiRequest<UpdateProfileResponse>('/users/me', {
+      const response = await apiRequest<UserProfile>('/users/me', {
         method: 'PATCH',
         token: accessToken,
         body: JSON.stringify(payload),
@@ -145,7 +136,7 @@ export function RegisterDifficultyScreen({ navigation, route }: Props) {
               disabled={isLoading}
               onPress={handleSkip}
             >
-              <Text style={styles.skip}>Prefiro não dizer</Text>
+              <Text style={styles.skip}>{DIFICULDADE_PREFIRO_NAO_DIZER}</Text>
             </TouchableOpacity>
 
             <ZyraButton
@@ -164,35 +155,11 @@ export function RegisterDifficultyScreen({ navigation, route }: Props) {
           Isso permitirá entender melhor{`\n`}nosso público!
         </Text>
 
-        <View style={styles.scale}>
-          {numbers.map((number) => (
-            <TouchableOpacity
-              key={number}
-              accessibilityRole="button"
-              activeOpacity={0.82}
-              disabled={isLoading}
-              onPress={() => setSelected(number)}
-              style={[
-                styles.circle,
-                selected === number && styles.selectedCircle,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.number,
-                  selected === number && styles.selectedNumber,
-                ]}
-              >
-                {number}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <View style={styles.captionRow}>
-          <Text style={styles.caption}>Nenhuma dificuldade</Text>
-          <Text style={styles.caption}>Muita dificuldade</Text>
-        </View>
+        <EscalaDificuldade
+          selected={selected}
+          onSelect={setSelected}
+          disabled={isLoading}
+        />
       </AuthLayout>
 
       {popup ? (
@@ -227,46 +194,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
     marginBottom: 24,
-  },
-  scale: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginHorizontal: 8,
-  },
-  circle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.input,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 2, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  selectedCircle: {
-    backgroundColor: theme.colors.primary,
-  },
-  number: {
-    color: theme.colors.text,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  selectedNumber: {
-    color: theme.colors.white,
-  },
-  captionRow: {
-    marginTop: 22,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  caption: {
-    fontSize: 11,
-    color: theme.colors.titleZyra,
-    fontFamily: theme.fonts.regular,
   },
   skip: {
     color: theme.colors.label,

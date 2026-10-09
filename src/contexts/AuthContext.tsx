@@ -28,6 +28,8 @@ export type UserProfile = {
   genero: string | null;
   tipoDaltonismo: string | null;
   nivelDificuldadeLooks: number | null;
+  /** Quando autorizou guardar o tipo de daltonismo (dado de saúde). */
+  consentimentoSaudeEm?: string | null;
 };
 
 type RefreshTokenResponse = {

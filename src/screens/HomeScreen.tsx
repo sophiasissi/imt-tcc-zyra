@@ -33,6 +33,7 @@ import { listarLooks, LookSalvo, removerLook } from '../services/looksApi';
 import { ClosetItemCard } from '../components/ClosetItemCard';
 import { GradientPillButton } from '../components/GradientPillButton';
 import { LookSalvoItem } from '../components/LookSalvoItem';
+import { PecaExpandida } from '../components/PecaExpandida';
 import { ZyraPopup } from '../components/ZyraPopup';
 
 import CameraSvg from '../../assets/icons/camera.svg';
@@ -123,6 +124,8 @@ export function HomeScreen({ navigation, route }: Props) {
 
   // Modo de seleção, como nas Fotos do iPhone: marca itens para excluir.
   const [isSelecionando, setIsSelecionando] = React.useState(false);
+  // Peça do armário aberta em tamanho grande.
+  const [pecaAberta, setPecaAberta] = React.useState<Peca | null>(null);
   const [selecionados, setSelecionados] = React.useState<string[]>([]);
   const [dialogoExclusao, setDialogoExclusao] =
     React.useState<DialogoExclusao | null>(null);
@@ -364,7 +367,7 @@ export function HomeScreen({ navigation, route }: Props) {
   );
 
   function handleColorAdd() {
-    console.log('[Home] Usuário acessou área ColorADD.');
+    navigation.navigate('ColorAdd');
   }
 
   function handleProfile() {
@@ -734,8 +737,10 @@ export function HomeScreen({ navigation, route }: Props) {
                   peca={peca}
                   selecionavel={isSelecionando}
                   selecionado={selecionados.includes(peca.id)}
-                  onPress={
-                    isSelecionando ? () => alternarSelecao(peca.id) : undefined
+                  onPress={() =>
+                    isSelecionando
+                      ? alternarSelecao(peca.id)
+                      : setPecaAberta(peca)
                   }
                 />
               ))}
@@ -835,6 +840,8 @@ export function HomeScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         </View>
       )}
+
+      <PecaExpandida peca={pecaAberta} onClose={() => setPecaAberta(null)} />
 
       {/* Um popup só, que troca de conteúdo entre a confirmação e o erro. */}
       <ZyraPopup

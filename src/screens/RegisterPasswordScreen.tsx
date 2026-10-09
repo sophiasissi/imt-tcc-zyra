@@ -36,7 +36,7 @@ function isEmailAlreadyRegistered(message: string) {
 }
 
 export function RegisterPasswordScreen({ navigation, route }: Props) {
-  const { firstName, name, email } = route.params;
+  const { firstName, name, email, versaoTermosAceita } = route.params;
 
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
@@ -109,6 +109,8 @@ export function RegisterPasswordScreen({ navigation, route }: Props) {
           nome: name,
           email,
           password,
+          // O back guarda quando e qual versão dos Termos foi aceita.
+          versaoTermosAceita,
         }),
       });
 
@@ -132,6 +134,7 @@ export function RegisterPasswordScreen({ navigation, route }: Props) {
             name,
             email,
             password,
+            versaoTermosAceita,
           });
         },
       });
