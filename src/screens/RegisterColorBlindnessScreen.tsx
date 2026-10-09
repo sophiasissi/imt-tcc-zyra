@@ -16,6 +16,11 @@ import {
 import { AuthLayout } from '../components/AuthLayout';
 import { ZyraButton } from '../components/ZyraButton';
 import { theme } from '../styles/theme';
+import {
+  DALTONISMO_OPCOES,
+  DALTONISMO_PREFIRO_NAO_DIZER,
+} from '../constants/perfil';
+import { ConsentimentoSaude } from '../components/ConsentimentoSaude';
 
 type Props = NativeStackScreenProps<
   RootStackParamList,
@@ -27,22 +32,14 @@ type ColorBlindnessOption = {
   value: TipoDaltonismoCadastro;
 };
 
-const options: ColorBlindnessOption[] = [
-  { label: 'Protanomalia', value: 'PROTANOMALIA' },
-  { label: 'Protanopia', value: 'PROTANOPIA' },
-  { label: 'Deuteranomalia', value: 'DEUTERANOMALIA' },
-  { label: 'Deuteranopia', value: 'DEUTERANOPIA' },
-  { label: 'Tritanomalia', value: 'TRITANOMALIA' },
-  { label: 'Tritanopia', value: 'TRITANOPIA' },
-  { label: 'Acromatopsia', value: 'ACROMATOPSIA' },
-  { label: 'Não sei', value: 'NAO_SEI' },
-];
+const options: ColorBlindnessOption[] = DALTONISMO_OPCOES;
 
 export function RegisterColorBlindnessScreen({ navigation, route }: Props) {
   const { dataNascimento, genero } = route.params;
 
   const [selected, setSelected] = useState<ColorBlindnessOption | null>(null);
   const [open, setOpen] = useState(false);
+  const [consentiu, setConsentiu] = useState(false);
 
   function choose(option: ColorBlindnessOption) {
     setSelected(option);
@@ -52,7 +49,7 @@ export function RegisterColorBlindnessScreen({ navigation, route }: Props) {
   }
 
   function handleContinue() {
-    if (!selected) {
+    if (!selected || !consentiu) {
       return;
     }
 
@@ -60,15 +57,19 @@ export function RegisterColorBlindnessScreen({ navigation, route }: Props) {
       dataNascimento,
       genero,
       tipoDaltonismo: selected.value,
+      consentimentoDadosSaude: true,
     });
   }
 
+  // Recusar a autorização não impede o cadastro: o consentimento da LGPD tem
+  // de ser livre, e o tipo de daltonismo não é necessário para usar o app.
   function handleSkip() {
-    console.log('[Onboarding] Tipo de daltonismo não informado.');
+    console.log('[Onboarding] Usuário preferiu não informar o daltonismo.');
 
     navigation.navigate('RegisterDifficulty', {
       dataNascimento,
       genero,
+      tipoDaltonismo: 'PREFIRO_NAO_DIZER',
     });
   }
 
@@ -79,13 +80,17 @@ export function RegisterColorBlindnessScreen({ navigation, route }: Props) {
       onBack={() => navigation.goBack()}
       footer={
         <View>
-          <Text onPress={handleSkip} style={styles.skip}>
-            Não tenho!
+          <Text
+            accessibilityRole="button"
+            onPress={handleSkip}
+            style={styles.skip}
+          >
+            {DALTONISMO_PREFIRO_NAO_DIZER}
           </Text>
 
           <ZyraButton
             title="Continuar"
-            disabled={selected === null}
+            disabled={selected === null || !consentiu}
             onPress={handleContinue}
           />
         </View>
@@ -107,6 +112,14 @@ export function RegisterColorBlindnessScreen({ navigation, route }: Props) {
         </Text>
         <Text style={styles.chevron}>⌄</Text>
       </TouchableOpacity>
+
+      <View style={styles.consentimento}>
+        <ConsentimentoSaude
+          aceito={consentiu}
+          onChange={setConsentiu}
+          onVerPolitica={() => navigation.navigate('PoliticaPrivacidade')}
+        />
+      </View>
 
       <Modal
         transparent
@@ -170,6 +183,9 @@ const styles = StyleSheet.create({
     color: theme.colors.label,
     fontFamily: theme.fonts.semiBold,
     fontSize: 16,
+  },
+  consentimento: {
+    marginTop: 18,
   },
   skip: {
     color: theme.colors.label,
