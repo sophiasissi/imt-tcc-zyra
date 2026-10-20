@@ -32,7 +32,8 @@ const CADASTRO_STEPS = [
 ];
 
 export function CapturedClothingScreen({ navigation, route }: Props) {
-  const { photoUri, photoTipo, colorName, colorAddSymbol, hex } = route.params;
+  const { photoUri, photoTipo, semFundo, colorName, colorAddSymbol, hex } =
+    route.params;
   const { tokens } = useAuth();
 
   const [isCadastrando, setIsCadastrando] = useState(false);
@@ -151,7 +152,12 @@ export function CapturedClothingScreen({ navigation, route }: Props) {
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
-          <Image source={{ uri: photoUri }} style={styles.clothingImage} />
+          {/* Sem fundo, a peça aparece inteira (contain); a foto com fundo
+              preenche o quadro (cover), como antes. */}
+          <Image
+            source={{ uri: photoUri }}
+            style={[styles.clothingImage, semFundo && styles.clothingSemFundo]}
+          />
 
           <View style={styles.bottomContent}>
             <Text style={styles.sectionTitle}>
@@ -257,6 +263,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     resizeMode: 'cover',
     backgroundColor: '#EAEAEA',
+  },
+  clothingSemFundo: {
+    resizeMode: 'contain',
   },
   bottomContent: {
     marginTop: 28,

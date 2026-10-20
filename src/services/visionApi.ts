@@ -1,3 +1,5 @@
+import { File, Paths } from 'expo-file-system';
+
 import {
   fetchWithTimeout,
   isNetworkErrorMessage,
@@ -116,4 +118,49 @@ export async function validateClothingFromImage(
     'clothing-validation',
     tipo,
   );
+}
+
+// Recortar o fundo leva ~1 s no servidor; o resto é o envio da foto.
+const REMOVE_BACKGROUND_TIMEOUT_MS = 20_000;
+
+/**
+ * Peça sem fundo (WebP com transparência), num arquivo temporário do app.
+ *
+ * Devolve null se não der (visão fora do ar, peça não encontrada): o cadastro
+ * segue com a foto original, então a pessoa nunca fica travada por isso.
+ */
+export async function removeBackgroundFromImage(
+  imageUri: string,
+  tipo?: TipoDeImagem,
+): Promise<string | null> {
+  const formData = new FormData();
+  formData.append(
+    'file',
+    photoFormDataPart(imageUri, 'remove-background', tipo),
+  );
+
+  try {
+    const response = await fetchWithTimeout(
+      `${VISION_API_URL}/remove-background`,
+      { method: 'POST', body: formData, headers: { Accept: 'image/webp' } },
+      REMOVE_BACKGROUND_TIMEOUT_MS,
+    );
+
+    if (!response.ok) {
+      console.warn(
+        `[Visão] Fundo não removido (HTTP ${response.status}); seguindo com a foto original.`,
+      );
+      return null;
+    }
+
+    const arquivo = new File(Paths.cache, `peca-sem-fundo-${Date.now()}.webp`);
+    arquivo.write(new Uint8Array(await response.arrayBuffer()));
+    return arquivo.uri;
+  } catch (error) {
+    console.warn(
+      '[Visão] Fundo não removido; seguindo com a foto original:',
+      error instanceof Error ? error.message : error,
+    );
+    return null;
+  }
 }

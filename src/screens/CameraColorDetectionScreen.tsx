@@ -21,6 +21,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import {
   detectColorFromImage,
   DetectColorResponse,
+  removeBackgroundFromImage,
   validateClothingFromImage,
   ValidateClothingResponse,
 } from '../services/visionApi';
@@ -88,6 +89,7 @@ const FIRST_DETECTION_DELAY_MS = 900;
 const CAPTURE_STEPS = [
   'Conferindo se é uma peça de roupa',
   'Identificando a cor e o símbolo ColorADD',
+  'Tirando o fundo da foto',
 ];
 
 function sleep(milliseconds: number) {
@@ -652,9 +654,12 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
       // "Cadastrar nova peça" — tirar foto não pode gastar com a OpenAI.
       // A cor não é essencial para seguir: se falhar, a câmera usa a última
       // leitura do loop, e a galeria deixa o back ler a cor no cadastro.
-      const [validation, corDaFoto] = await Promise.all([
+      // O fundo sai em paralelo, para não somar tempo. A cor é sempre lida da
+      // foto original; a versão sem fundo é a que vai para o armário.
+      const [validation, corDaFoto, fotoSemFundo] = await Promise.all([
         validateClothingFromImage(photoUri, tipo),
         detectColorFromImage(photoUri, tipo).catch(() => null),
+        removeBackgroundFromImage(photoUri, tipo),
       ]);
 
       if (!isScreenActiveRef.current) {
@@ -702,8 +707,9 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
       setFrozenPhotoUri(null);
 
       navigation.navigate('CapturedClothing', {
-        photoUri,
-        photoTipo: tipo,
+        photoUri: fotoSemFundo ?? photoUri,
+        photoTipo: fotoSemFundo ? 'image/webp' : tipo,
+        semFundo: Boolean(fotoSemFundo),
         colorName,
         colorAddSymbol,
         hex,
