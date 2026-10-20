@@ -22,7 +22,13 @@
           "photosPermission": "O ZYRA acessa suas fotos para você escolher uma peça de roupa e cadastrá-la no seu armário."
         }
       ],
-      "expo-image"
+      "expo-image",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "O ZYRA usa sua localização para ver a previsão do tempo e sugerir looks adequados ao clima."
+        }
+      ]
     ]
   }
 }
