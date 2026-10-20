@@ -15,7 +15,6 @@ import {
 import React from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Svg, {
   Defs,
   RadialGradient,
@@ -30,6 +29,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ApiError } from '../services/api';
 import { listarPecas, Peca, removerPeca } from '../services/pecasApi';
 import { listarLooks, LookSalvo, removerLook } from '../services/looksApi';
+import { FotoPerfil } from '../components/FotoPerfil';
 import { ClosetItemCard } from '../components/ClosetItemCard';
 import { GradientPillButton } from '../components/GradientPillButton';
 import { LookSalvoItem } from '../components/LookSalvoItem';
@@ -565,13 +565,7 @@ export function HomeScreen({ navigation, route }: Props) {
               style={styles.profileButton}
               onPress={handleProfile}
             >
-              <LinearGradient
-                colors={['#DE0051', '#AB003E', '#78002C']}
-                locations={[0.3, 0.67, 1]}
-                start={{ x: 1, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={styles.profileGradient}
-              />
+              <FotoPerfil uri={user?.fotoUrl} tamanho={36} />
             </TouchableOpacity>
           </View>
         </View>
@@ -917,9 +911,6 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     overflow: 'hidden',
-  },
-  profileGradient: {
-    ...StyleSheet.absoluteFill,
   },
   colorAddOuter: {
     width: 56,

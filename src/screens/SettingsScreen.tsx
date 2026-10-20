@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import {
+  ActivityIndicator,
+  Linking,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -8,13 +11,16 @@ import {
   View,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
+import * as ImagePicker from 'expo-image-picker';
 
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { theme } from '../styles/theme';
-import { ZyraPopup } from '../components/ZyraPopup';
+import { FotoPerfil } from '../components/FotoPerfil';
+import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
 import { useAuth } from '../contexts/AuthContext';
+import { ApiError } from '../services/api';
+import { atualizarFotoPerfil, removerFotoPerfil } from '../services/perfilApi';
 
 import BackIcon from '../../assets/icons/backArrow.svg';
 import LogoColorADD from '../../assets/icons/logo_ColorADD.svg';
@@ -27,6 +33,16 @@ import LogoutIcon from '../../assets/icons/logout-svgrepo-com.svg';
 import EyeIcon from '../../assets/icons/eye-open.svg';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
+
+type OrigemDaFoto = 'camera' | 'galeria';
+
+// Tempo para o menu (ou o alerta de permissão do sistema) terminar de fechar
+// antes de abrir a câmera ou a galeria: no iOS, abrir junto pode falhar.
+const MENU_FECHANDO_MS = 350;
+
+function sleep(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
 
 /** Lixeira, para "Excluir conta" (não há SVG dela em assets). */
 function TrashIcon({ width, height }: { width: number; height: number }) {
@@ -89,10 +105,161 @@ function MenuItem({ title, icon, onPress, danger = false }: MenuItemProps) {
 }
 
 export function SettingsScreen({ navigation }: Props) {
-  const { signOut, user } = useAuth();
+  const { signOut, user, tokens, updateUser } = useAuth();
 
   const [exitModalVisible, setExitModalVisible] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [opcoesFotoVisiveis, setOpcoesFotoVisiveis] = useState(false);
+  const [enviandoFoto, setEnviandoFoto] = useState(false);
+  const [popup, setPopup] = useState<ZyraPopupConfig | null>(null);
+
+  const fotoUrl = user?.fotoUrl ?? null;
+
+  /**
+   * Pede a permissão só da opção escolhida, na hora de usar (a câmera não
+   * precisa da galeria, e vice-versa). Recusada de vez, só os Ajustes liberam.
+   */
+  async function garantirPermissao(origem: OrigemDaFoto) {
+    const ler =
+      origem === 'camera'
+        ? ImagePicker.getCameraPermissionsAsync
+        : ImagePicker.getMediaLibraryPermissionsAsync;
+    const pedir =
+      origem === 'camera'
+        ? ImagePicker.requestCameraPermissionsAsync
+        : ImagePicker.requestMediaLibraryPermissionsAsync;
+
+    let permissao = await ler();
+    if (!permissao.granted && permissao.canAskAgain) {
+      permissao = await pedir();
+    }
+    if (permissao.granted) {
+      return true;
+    }
+
+    if (Platform.OS === 'ios') await sleep(MENU_FECHANDO_MS);
+
+    setPopup({
+      variant: 'warning',
+      title:
+        origem === 'camera'
+          ? 'Permita o acesso à câmera'
+          : 'Permita o acesso às fotos',
+      message:
+        origem === 'camera'
+          ? 'Para tirar a foto do perfil, libere a câmera para o ZYRA nos Ajustes do celular.'
+          : 'Para escolher a foto do perfil, libere o acesso às fotos do ZYRA nos Ajustes do celular.',
+      buttonText: 'Abrir Ajustes',
+      onConfirm: () => {
+        setPopup(null);
+        Linking.openSettings().catch((error: unknown) =>
+          console.error('[Perfil] Falha ao abrir os Ajustes:', error),
+        );
+      },
+      secondaryButtonText: 'Agora não',
+      onSecondaryPress: () => setPopup(null),
+    });
+    return false;
+  }
+
+  async function escolherFoto(origem: OrigemDaFoto) {
+    setOpcoesFotoVisiveis(false);
+    await sleep(MENU_FECHANDO_MS);
+
+    const accessToken = tokens?.accessToken;
+    if (!accessToken || !(await garantirPermissao(origem))) {
+      return;
+    }
+
+    // Recorte quadrado: a foto aparece num círculo.
+    const opcoes: ImagePicker.ImagePickerOptions = {
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    };
+
+    let escolha: ImagePicker.ImagePickerResult;
+    try {
+      escolha =
+        origem === 'camera'
+          ? await ImagePicker.launchCameraAsync({
+              ...opcoes,
+              cameraType: ImagePicker.CameraType.front,
+            })
+          : await ImagePicker.launchImageLibraryAsync({
+              ...opcoes,
+              // HEIC (padrão do iPhone) vem convertido para JPEG.
+              preferredAssetRepresentationMode:
+                ImagePicker.UIImagePickerPreferredAssetRepresentationMode
+                  .Compatible,
+            });
+    } catch (error) {
+      console.error('[Perfil] Falha ao abrir a câmera ou a galeria:', error);
+      setPopup({
+        variant: 'error',
+        title:
+          origem === 'camera'
+            ? 'Não foi possível abrir a câmera'
+            : 'Não foi possível abrir a galeria',
+        message: 'Tente novamente em instantes.',
+        buttonText: 'Entendi',
+      });
+      return;
+    }
+
+    const imagem = escolha.canceled ? null : escolha.assets?.[0];
+    if (!imagem) {
+      return;
+    }
+
+    setEnviandoFoto(true);
+    try {
+      const perfil = await atualizarFotoPerfil(imagem.uri, accessToken);
+      updateUser({ fotoUrl: perfil.fotoUrl ?? null });
+    } catch (error) {
+      console.error('[Perfil] Falha ao enviar a foto:', error);
+      setPopup({
+        variant: 'error',
+        title: 'Não foi possível trocar a foto',
+        message:
+          error instanceof ApiError
+            ? error.message
+            : 'Tente novamente em instantes.',
+        buttonText: 'Entendi',
+      });
+    } finally {
+      setEnviandoFoto(false);
+    }
+  }
+
+  async function removerFoto() {
+    setOpcoesFotoVisiveis(false);
+
+    const accessToken = tokens?.accessToken;
+    if (!accessToken) {
+      return;
+    }
+
+    setEnviandoFoto(true);
+    try {
+      await removerFotoPerfil(accessToken);
+      updateUser({ fotoUrl: null });
+    } catch (error) {
+      console.error('[Perfil] Falha ao remover a foto:', error);
+      setPopup({
+        variant: 'error',
+        title: 'Não foi possível remover a foto',
+        message:
+          error instanceof ApiError
+            ? error.message
+            : 'Tente novamente em instantes.',
+        buttonText: 'Entendi',
+      });
+    } finally {
+      setEnviandoFoto(false);
+    }
+  }
 
   const displayName = user?.nome ?? 'Nome do Usuário';
 
@@ -226,20 +393,75 @@ export function SettingsScreen({ navigation }: Props) {
         </ScrollView>
 
         {/* Depois da rolagem, para ficar por cima dela. */}
-        <View style={styles.avatarWrapper}>
-          <LinearGradient
-            colors={['#DE0051', '#AB003E', '#78002C']}
-            locations={[0.25, 0.65, 1]}
-            start={{ x: 1, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={styles.avatar}
-          />
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={
+            fotoUrl ? 'Trocar a foto de perfil' : 'Adicionar foto de perfil'
+          }
+          activeOpacity={0.85}
+          disabled={enviandoFoto}
+          style={styles.avatarWrapper}
+          onPress={() => setOpcoesFotoVisiveis(true)}
+        >
+          <FotoPerfil uri={fotoUrl} tamanho={116} />
+
+          {enviandoFoto ? (
+            <View style={styles.avatarCarregando}>
+              <ActivityIndicator color={theme.colors.white} />
+            </View>
+          ) : null}
 
           <View style={styles.editBadge}>
             <Text style={styles.editBadgeText}>✎</Text>
           </View>
-        </View>
+        </TouchableOpacity>
       </View>
+
+      {/* Camada na tela, e não Modal: no iOS, um Modal fechando junto com o
+          seletor de fotos pode deixar uma camada invisível travando os toques. */}
+      {opcoesFotoVisiveis ? (
+        <View style={styles.opcoesFundo}>
+          <TouchableOpacity
+            accessibilityLabel="Fechar opções da foto"
+            activeOpacity={1}
+            style={StyleSheet.absoluteFill}
+            onPress={() => setOpcoesFotoVisiveis(false)}
+          />
+          <View style={styles.opcoesCartao}>
+            <Text style={styles.opcoesTitulo}>Foto de perfil</Text>
+
+            <OpcaoDaFoto
+              texto="Tirar foto"
+              onPress={() => void escolherFoto('camera')}
+            />
+            <OpcaoDaFoto
+              texto="Escolher da galeria"
+              onPress={() => void escolherFoto('galeria')}
+            />
+            {fotoUrl ? (
+              <OpcaoDaFoto
+                texto="Remover foto"
+                perigo
+                onPress={() => void removerFoto()}
+              />
+            ) : null}
+            <OpcaoDaFoto
+              texto="Cancelar"
+              onPress={() => setOpcoesFotoVisiveis(false)}
+            />
+          </View>
+        </View>
+      ) : null}
+
+      {popup ? (
+        <ZyraPopup
+          visible
+          modal={false}
+          {...popup}
+          onConfirm={popup.onConfirm ?? (() => setPopup(null))}
+          onClose={() => setPopup(null)}
+        />
+      ) : null}
 
       {exitModalVisible ? (
         <ZyraPopup
@@ -258,6 +480,29 @@ export function SettingsScreen({ navigation }: Props) {
   );
 }
 
+function OpcaoDaFoto({
+  texto,
+  onPress,
+  perigo = false,
+}: {
+  texto: string;
+  onPress: () => void;
+  perigo?: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      accessibilityRole="button"
+      activeOpacity={0.75}
+      style={styles.opcao}
+      onPress={onPress}
+    >
+      <Text style={[styles.opcaoTexto, perigo && styles.opcaoPerigo]}>
+        {texto}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -266,7 +511,9 @@ const styles = StyleSheet.create({
   header: {
     paddingTop: 58,
     paddingHorizontal: 20,
-    height: 112,
+    // Mais alto: o painel (e a foto, que fica na borda dele) desce, e a foto
+    // não encosta no topo da tela.
+    height: 150,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -297,10 +544,55 @@ const styles = StyleSheet.create({
     top: -58,
     alignSelf: 'center',
   },
-  avatar: {
-    width: 116,
-    height: 116,
+  avatarCarregando: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     borderRadius: 58,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  opcoesFundo: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  opcoesCartao: {
+    backgroundColor: theme.colors.background,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 22,
+    paddingBottom: 36,
+    paddingHorizontal: 24,
+  },
+  opcoesTitulo: {
+    color: theme.colors.title,
+    fontFamily: theme.fonts.bold,
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  opcao: {
+    minHeight: 54,
+    justifyContent: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#D0D0D0',
+  },
+  opcaoTexto: {
+    color: theme.colors.text,
+    fontFamily: theme.fonts.semiBold,
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  opcaoPerigo: {
+    color: '#C62828',
   },
   editBadge: {
     position: 'absolute',
@@ -323,14 +615,14 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.bold,
     fontSize: 20,
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 2,
   },
   sectionTitle: {
     color: theme.colors.white,
     fontFamily: theme.fonts.bold,
     fontSize: 17,
-    marginTop: 24,
-    marginBottom: 14,
+    marginTop: 20,
+    marginBottom: 10,
   },
   menuGroup: {
     gap: 5,

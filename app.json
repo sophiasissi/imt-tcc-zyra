@@ -22,6 +22,7 @@
           "photosPermission": "O ZYRA acessa suas fotos para você escolher uma peça de roupa e cadastrá-la no seu armário."
         }
       ],
+      "expo-image",
       [
         "expo-location",
         {
