@@ -30,6 +30,8 @@ export type UserProfile = {
   nivelDificuldadeLooks: number | null;
   /** Quando autorizou guardar o tipo de daltonismo (dado de saúde). */
   consentimentoSaudeEm?: string | null;
+  /** Foto de perfil (URL assinada do S3, expira em 1 hora), ou null. */
+  fotoUrl?: string | null;
 };
 
 type RefreshTokenResponse = {
