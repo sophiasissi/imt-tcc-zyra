@@ -15,7 +15,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { getColorAddSymbol } from '../utils/colorAddSymbols';
 import { theme } from '../styles/theme';
 import { useAuth } from '../contexts/AuthContext';
-import { cadastrarPeca } from '../services/pecasApi';
+import { cadastrarPeca, nomeDaPeca } from '../services/pecasApi';
 import { ZyraButton } from '../components/ZyraButton';
 import { ZyraLoadingPopup } from '../components/ZyraLoadingPopup';
 import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
@@ -59,7 +59,7 @@ export function CapturedClothingScreen({ navigation, route }: Props) {
     setIsCadastrando(true);
 
     try {
-      await cadastrarPeca(
+      const peca = await cadastrarPeca(
         {
           photoUri,
           photoTipo,
@@ -73,7 +73,12 @@ export function CapturedClothingScreen({ navigation, route }: Props) {
       setPopup({
         variant: 'success',
         title: 'Roupa cadastrada!',
-        message: 'A peça já está no seu armário digital.',
+        // A análise da peça pode corrigir a cor lida pela câmera (luz de
+        // lâmpada engana a leitura por pixels), então diz o que foi salvo.
+        message: `Salvamos ${nomeDaPeca(peca)}, ${
+          getColorAddSymbol(peca.colorAddSymbol)?.label ??
+          peca.corNome.toLowerCase()
+        }. A peça já está no seu armário digital.`,
         buttonText: 'Ir para o início',
         // Volta para a Home tirando a câmera e esta tela da pilha. A Home
         // recarrega o armário ao ganhar foco, então a peça nova já aparece.

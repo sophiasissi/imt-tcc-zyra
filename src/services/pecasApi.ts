@@ -6,6 +6,10 @@ import { apiRequest } from './api';
 export type Categoria =
   | 'CAMISETA'
   | 'CAMISA'
+  | 'BLUSA'
+  | 'CROPPED'
+  | 'TOP'
+  | 'BODY'
   | 'MOLETOM'
   | 'JAQUETA'
   | 'BLAZER'
@@ -31,12 +35,29 @@ export type Ocasiao =
   | 'PRAIA'
   | 'CASA';
 export type Aquecimento = 'LEVE' | 'MEDIO' | 'QUENTE';
-export type Material = 'JEANS' | 'COURO';
+export type Material =
+  | 'JEANS'
+  | 'COURO'
+  | 'MOLETOM'
+  | 'MALHA'
+  | 'POLIAMIDA'
+  | 'TRICO'
+  | 'SOFT'
+  | 'LINHO'
+  | 'ALFAIATARIA'
+  | 'CETIM'
+  | 'VISCOSE'
+  | 'VELUDO';
+export type Manga = 'SEM_MANGA' | 'CURTA' | 'LONGA';
 
 /** Nome da categoria como aparece para a pessoa (e para o leitor de tela). */
 export const CATEGORIA_LABEL: Record<Categoria, string> = {
   CAMISETA: 'camiseta',
   CAMISA: 'camisa',
+  BLUSA: 'blusa',
+  CROPPED: 'cropped',
+  TOP: 'top',
+  BODY: 'body',
   MOLETOM: 'moletom',
   JAQUETA: 'jaqueta',
   BLAZER: 'blazer',
@@ -47,6 +68,91 @@ export const CATEGORIA_LABEL: Record<Categoria, string> = {
   TENIS: 'tênis',
   SAPATO: 'sapato',
 };
+
+export const MATERIAL_LABEL: Record<Material, string> = {
+  JEANS: 'jeans',
+  COURO: 'couro',
+  MOLETOM: 'moletom',
+  MALHA: 'malha',
+  POLIAMIDA: 'poliamida',
+  TRICO: 'tricô',
+  SOFT: 'soft',
+  LINHO: 'linho',
+  ALFAIATARIA: 'alfaiataria',
+  CETIM: 'cetim',
+  VISCOSE: 'viscose',
+  VELUDO: 'veludo',
+};
+
+// Mesma regra do back (src/looks/nome-da-peca.ts): nas peças de baixo o
+// tecido entra no nome ("calça jeans", "calça de moletom"); nas outras, só
+// jeans e couro. Manga curta é o comum e não aparece; o top nunca tem manga.
+const MATERIAL_SEMPRE_NO_NOME: Categoria[] = ['CALCA', 'SHORT', 'SAIA'];
+const MATERIAL_SEMPRE_NA_PECA: Material[] = ['JEANS', 'COURO'];
+// Jaqueta de tecido macio é casaco ("casaco de moletom"); jeans e couro
+// continuam jaqueta.
+const MATERIAIS_DE_CASACO: Material[] = [
+  'MOLETOM',
+  'TRICO',
+  'SOFT',
+  'MALHA',
+  'VELUDO',
+];
+const COM_MANGA_NO_NOME: Categoria[] = [
+  'CAMISETA',
+  'CAMISA',
+  'BLUSA',
+  'CROPPED',
+  'BODY',
+  'VESTIDO',
+];
+
+function comMaterial(nome: string, material: Material) {
+  return material === 'JEANS'
+    ? `${nome} jeans`
+    : `${nome} de ${MATERIAL_LABEL[material]}`;
+}
+
+/**
+ * Nome da peça como a pessoa diria: "calça jeans", "calça de moletom",
+ * "camiseta manga longa", "regata", "body manga longa", "casaco de moletom".
+ */
+export function nomeDaPeca(
+  peca: Pick<Peca, 'categoria'> & Partial<Pick<Peca, 'material' | 'manga'>>,
+) {
+  const { categoria, material, manga } = peca;
+
+  if (categoria === 'CAMISETA' && manga === 'SEM_MANGA') {
+    return material && MATERIAL_SEMPRE_NA_PECA.includes(material)
+      ? comMaterial('regata', material)
+      : 'regata';
+  }
+
+  if (
+    categoria === 'JAQUETA' &&
+    material &&
+    MATERIAIS_DE_CASACO.includes(material)
+  ) {
+    return comMaterial('casaco', material);
+  }
+
+  let nome = CATEGORIA_LABEL[categoria];
+
+  const materialNoNome =
+    material &&
+    // "Moletom de moletom" não diz nada.
+    !(categoria === 'MOLETOM' && material === 'MOLETOM') &&
+    (MATERIAL_SEMPRE_NO_NOME.includes(categoria) ||
+      MATERIAL_SEMPRE_NA_PECA.includes(material));
+  if (materialNoNome) nome = comMaterial(nome, material);
+
+  if (COM_MANGA_NO_NOME.includes(categoria)) {
+    if (manga === 'LONGA') nome += ' manga longa';
+    if (manga === 'SEM_MANGA') nome += ' sem manga';
+  }
+
+  return nome;
+}
 
 /** Peça do closet como o back devolve (model `Peca` do Prisma). */
 export type Peca = {
@@ -60,10 +166,12 @@ export type Peca = {
   ocasioes: Ocasiao[];
   aquecimento: Aquecimento | null;
   material: Material | null;
+  /** Só nas peças de cima, no body e no vestido. */
+  manga: Manga | null;
   corNome: string;
   hex: string;
   colorAddSymbol: string;
-  /** Segunda cor de peças listradas ou estampadas; a visão ainda não preenche. */
+  /** Segunda cor de peças estampadas ou com detalhe grande, vista na análise. */
   corSecundariaNome: string | null;
   hexSecundario: string | null;
   colorAddSymbolSecundario: string | null;
@@ -87,6 +195,7 @@ export type AtualizarPecaInput = Partial<
   Pick<
     Peca,
     | 'categoria'
+    | 'manga'
     | 'estilo'
     | 'estampa'
     | 'ocasioes'

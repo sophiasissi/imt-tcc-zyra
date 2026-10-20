@@ -8,7 +8,7 @@ import {
   ViewStyle,
 } from 'react-native';
 
-import { CATEGORIA_LABEL, Peca } from '../services/pecasApi';
+import { nomeDaPeca, Peca } from '../services/pecasApi';
 import { theme } from '../styles/theme';
 import { getColorAddSymbol } from '../utils/colorAddSymbols';
 import { SelectionCircle } from './SelectionCircle';
@@ -38,7 +38,7 @@ export function ClosetItemCard({
 }: Props) {
   const symbol = getColorAddSymbol(peca.colorAddSymbol);
   const nomeCor = symbol?.label ?? peca.corNome;
-  const categoria = CATEGORIA_LABEL[peca.categoria];
+  const categoria = nomeDaPeca(peca);
   const descricao = [categoria, nomeCor].filter(Boolean).join(', ');
 
   const conteudo = (
