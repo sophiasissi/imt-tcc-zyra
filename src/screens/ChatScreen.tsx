@@ -26,6 +26,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
 
 import { ClosetItemCard } from '../components/ClosetItemCard';
+import { cabeNaColagem, LookColagem } from '../components/LookColagem';
 import { ZyraPopup } from '../components/ZyraPopup';
 import { useAuth } from '../contexts/AuthContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -670,6 +671,15 @@ export function ChatScreen({ navigation, route }: Props) {
     return { width: Math.min(largura, altura), height: altura };
   }, [lookPecas.length, screenHeight, screenWidth]);
 
+  // Área inteira acima do chat, para a colagem do look.
+  const areaDoLook = {
+    largura: screenWidth - LOOK_AREA_SIDE * 2,
+    altura: Math.max(
+      screenHeight - LOOK_AREA_TOP - COLLAPSED_PANEL_HEIGHT - 10,
+      240,
+    ),
+  };
+
   async function handleSend() {
     const normalizedText = inputText.trim();
 
@@ -833,15 +843,34 @@ export function ChatScreen({ navigation, route }: Props) {
             </Text>
           </View>
 
-          <ScrollView
-            style={styles.lookScroll}
-            contentContainerStyle={styles.lookGrid}
-            accessibilityLabel="Peças do look sugerido"
-          >
-            {lookPecas.map((peca) => (
-              <ClosetItemCard key={peca.id} peca={peca} style={lookCardSize} />
-            ))}
-          </ScrollView>
+          {/* Peças sem fundo viram colagem, como no mockup; com alguma foto
+              com fundo, os cards de antes. */}
+          {cabeNaColagem(lookPecas) ? (
+            <View
+              style={styles.lookColagem}
+              accessibilityLabel="Peças do look sugerido"
+            >
+              <LookColagem
+                pecas={lookPecas}
+                largura={areaDoLook.largura}
+                altura={areaDoLook.altura}
+              />
+            </View>
+          ) : (
+            <ScrollView
+              style={styles.lookScroll}
+              contentContainerStyle={styles.lookGrid}
+              accessibilityLabel="Peças do look sugerido"
+            >
+              {lookPecas.map((peca) => (
+                <ClosetItemCard
+                  key={peca.id}
+                  peca={peca}
+                  style={[lookCardSize, styles.lookCard]}
+                />
+              ))}
+            </ScrollView>
+          )}
         </Animated.View>
       ) : null}
 
@@ -1127,6 +1156,14 @@ const styles = StyleSheet.create({
   },
   lookScroll: {
     width: '100%',
+  },
+  // Sobre o fundo claro do chat, um véu escuro leve no lugar do claro do
+  // armário: sem ele, as peças brancas sem fundo sumiriam.
+  lookCard: {
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  lookColagem: {
+    alignItems: 'center',
   },
   lookGrid: {
     flexDirection: 'row',

@@ -27,6 +27,7 @@ import {
 } from '../services/visionApi';
 import { getColorAddSymbol } from '../utils/colorAddSymbols';
 import { TipoDeImagem, tipoDeImagemAceito } from '../utils/photoUpload';
+import { recortarMira, reduzirFoto } from '../utils/reduzirImagem';
 import { theme } from '../styles/theme';
 import { ZyraPopup, ZyraPopupConfig } from '../components/ZyraPopup';
 import { ZyraLoadingPopup } from '../components/ZyraLoadingPopup';
@@ -253,7 +254,11 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
         return;
       }
 
-      const response = await detectColorFromImage(photo.uri);
+      // Só a área da mira vai pela rede (~12 KB), e não a foto inteira.
+      const mira = await recortarMira(photo.uri, photo.width, photo.height);
+      const response = await detectColorFromImage(mira, 'image/jpeg', {
+        jaRecortada: true,
+      });
 
       if (!isScreenActiveRef.current) {
         return;
@@ -492,6 +497,8 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
 
     let capturedPhotoUri: string | null = null;
 
+    let capturedPhotoSize: { largura: number; altura: number } | null = null;
+
     try {
       isValidatingClothingRef.current = true;
       isCapturingPhotoRef.current = true;
@@ -506,6 +513,9 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
       });
 
       capturedPhotoUri = photo?.uri ?? null;
+      capturedPhotoSize = photo
+        ? { largura: photo.width, altura: photo.height }
+        : null;
 
       if (capturedPhotoUri && isScreenActiveRef.current) {
         setFrozenPhotoUri(capturedPhotoUri);
@@ -548,7 +558,10 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
       return;
     }
 
-    await validarFoto(capturedPhotoUri, { origem: 'camera' });
+    await validarFoto(capturedPhotoUri, {
+      origem: 'camera',
+      ...(capturedPhotoSize ?? { largura: 0, altura: 0 }),
+    });
   }
 
   /**
@@ -634,7 +647,12 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
     setIsValidatingClothing(true);
 
     try {
-      await validarFoto(imagem.uri, { origem: 'galeria', tipo });
+      await validarFoto(imagem.uri, {
+        origem: 'galeria',
+        tipo,
+        largura: imagem.width,
+        altura: imagem.height,
+      });
     } finally {
       isNaGaleriaRef.current = false;
     }
@@ -645,10 +663,32 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
    * chamou já tenha marcado a validação como em andamento.
    */
   async function validarFoto(
-    photoUri: string,
-    { origem, tipo }: { origem: 'camera' | 'galeria'; tipo?: TipoDeImagem },
+    fotoOriginal: string,
+    {
+      origem,
+      tipo: tipoOriginal,
+      largura,
+      altura,
+    }: {
+      origem: 'camera' | 'galeria';
+      tipo?: TipoDeImagem;
+      largura: number;
+      altura: number;
+    },
   ) {
     try {
+      // Reduzida uma vez (no máximo 1600 px, JPEG) e usada em tudo: validação,
+      // cor, fundo e cadastro. A original tem vários MB e ia três vezes pela
+      // rede ao mesmo tempo. Sem as dimensões, segue com a original.
+      const photoUri =
+        largura && altura
+          ? await reduzirFoto(fotoOriginal, largura, altura).catch(
+              () => fotoOriginal,
+            )
+          : fotoOriginal;
+      const tipo: TipoDeImagem | undefined =
+        photoUri === fotoOriginal ? tipoOriginal : 'image/jpeg';
+
       // Só as etapas gratuitas rodam aqui: a validação (CLIP local) e a cor da
       // foto (OpenCV). A análise paga fica para quando a pessoa tocar em
       // "Cadastrar nova peça" — tirar foto não pode gastar com a OpenAI.
@@ -710,6 +750,7 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
         photoUri: fotoSemFundo ?? photoUri,
         photoTipo: fotoSemFundo ? 'image/webp' : tipo,
         semFundo: Boolean(fotoSemFundo),
+        tipoDaPeca: validation.tipo ?? null,
         colorName,
         colorAddSymbol,
         hex,

@@ -29,10 +29,15 @@ export type DetectColorResponse = {
   warningCode?: string | null;
 };
 
+/** Tipo da peça pela foto (CLIP), para a recomendação antes do cadastro. */
+export type TipoDaFoto = 'CIMA' | 'BAIXO' | 'VESTIDO' | 'CALCADO';
+
 export type ValidateClothingResponse = {
   isClothing: boolean;
   confidence: number;
   reason?: 'PERSON_DETECTED' | 'NOT_CLOTHING' | string | null;
+  /** null quando o modelo não tem certeza do tipo: aí o app não recomenda. */
+  tipo?: TipoDaFoto | null;
 };
 
 async function postImageFile<TResponse>(
@@ -99,9 +104,12 @@ async function postImageFile<TResponse>(
 export async function detectColorFromImage(
   imageUri: string,
   tipo?: TipoDeImagem,
+  opcoes: { jaRecortada?: boolean } = {},
 ): Promise<DetectColorResponse> {
+  // jaRecortada: a imagem já é só a área da mira (recortarMira); a visão não
+  // recorta de novo.
   return postImageFile<DetectColorResponse>(
-    '/detect-color',
+    opcoes.jaRecortada ? '/detect-color?regiao=mira' : '/detect-color',
     imageUri,
     'camera-frame',
     tipo,

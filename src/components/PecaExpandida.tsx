@@ -16,6 +16,7 @@ import Svg, { Path } from 'react-native-svg';
 import { nomeDaPeca, Peca } from '../services/pecasApi';
 import { theme } from '../styles/theme';
 import { getColorAddSymbol } from '../utils/colorAddSymbols';
+import { FotoDaPeca } from './FotoDaPeca';
 
 type Props = {
   /** Peça aberta; null fecha. */
@@ -118,8 +119,8 @@ export function PecaExpandida({ peca, onClose }: Props) {
             },
           ]}
         >
-          <Image
-            source={{ uri: pecaVisivel.imagemUrl }}
+          <FotoDaPeca
+            uri={pecaVisivel.imagemUrl}
             style={[styles.photo, { height: cardWidth * (4 / 3) }]}
             accessible
             accessibilityLabel={descricao || 'Peça do seu armário'}
