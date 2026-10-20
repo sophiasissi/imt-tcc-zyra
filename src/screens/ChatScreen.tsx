@@ -30,6 +30,7 @@ import { ZyraPopup } from '../components/ZyraPopup';
 import { useAuth } from '../contexts/AuthContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { ApiError } from '../services/api';
+import { obterLocalizacao } from '../services/localizacao';
 import {
   MensagemHistorico,
   PecaDoLook,
@@ -84,23 +85,9 @@ const EXPANDED_PANEL_TOP = 115;
 // Quantas mensagens anteriores vão junto, para o back entender respostas curtas.
 const MENSAGENS_DE_CONTEXTO = 6;
 
-// O back aceita nomes de look com até 60 caracteres.
-const TITULO_MAX = 60;
-
-/**
- * Título do look na Galeria: primeira letra maiúscula e cortado no limite.
- * Serve também para o título provisório (o próprio pedido da pessoa), usado
- * enquanto o back não manda o `titulo` gerado pela IA.
- */
-function formatarTitulo(texto: string) {
-  const limpo = texto.replace(/\s+/g, ' ').trim();
-  const cortado =
-    limpo.length > TITULO_MAX
-      ? `${limpo.slice(0, TITULO_MAX - 1).trimEnd()}…`
-      : limpo;
-
-  return cortado.charAt(0).toUpperCase() + cortado.slice(1);
-}
+// Mensagens da pessoa que vão para o back criar o título do look salvo: as
+// últimas, para um ajuste ("troca a calça") manter o evento do pedido.
+const MENSAGENS_DO_PEDIDO = 3;
 
 type DialogoSalvar =
   | { tipo: 'pergunta' }
@@ -150,9 +137,13 @@ export function ChatScreen({ navigation, route }: Props) {
   const isKeyboardVisible = React.useRef(false);
   const isClosing = React.useRef(false);
   const isMounted = React.useRef(true);
-  // Título e ocasião do look na tela, guardados para o momento de salvar.
-  const lookTitulo = React.useRef<string | null>(null);
+  // Pedido e ocasião do look na tela, guardados para o momento de salvar. O
+  // back transforma o pedido num título curto ("Casamento à noite").
+  const lookPedido = React.useRef<string | null>(null);
   const lookOcasiao = React.useRef<Ocasiao | null>(null);
+  // O look na tela já foi salvo pela conversa ("sim" para "Quer salvar esse
+  // look?"): aí a seta de voltar não pergunta de novo.
+  const lookJaSalvo = React.useRef(false);
 
   const { tokens } = useAuth();
   const accessToken = tokens?.accessToken ?? null;
@@ -360,7 +351,11 @@ export function ChatScreen({ navigation, route }: Props) {
       return;
     }
 
-    if (isLookReadyRef.current && lookPecas.length > 0) {
+    if (
+      isLookReadyRef.current &&
+      lookPecas.length > 0 &&
+      !lookJaSalvo.current
+    ) {
       Keyboard.dismiss();
       setDialogoSalvar({ tipo: 'pergunta' });
       return;
@@ -380,7 +375,7 @@ export function ChatScreen({ navigation, route }: Props) {
       await salvarLook(
         {
           pecaIds: lookPecas.map((peca) => peca.id),
-          nome: lookTitulo.current ?? undefined,
+          pedido: lookPedido.current ?? undefined,
           ocasiao: lookOcasiao.current ?? undefined,
         },
         accessToken,
@@ -646,7 +641,13 @@ export function ChatScreen({ navigation, route }: Props) {
   function replaceLoadingMessage(loadingId: string, text: string) {
     setMessages((currentMessages) =>
       currentMessages.map((message) =>
-        message.id === loadingId ? { ...message, text } : message,
+        // Troca o id "loading-" por um definitivo: o histórico que vai para o
+        // back descarta as mensagens "loading-", e sem isso as respostas da
+        // Zyra nunca chegavam lá (o "sim" para salvar não era entendido e a
+        // previsão do tempo se repetia).
+        message.id === loadingId
+          ? { ...message, id: loadingId.replace('loading-', 'zyra-'), text }
+          : message,
       ),
     );
   }
@@ -682,7 +683,9 @@ export function ChatScreen({ navigation, route }: Props) {
       .slice(-MENSAGENS_DE_CONTEXTO)
       .map((message) => ({
         autor: message.author === 'user' ? 'usuario' : 'zyra',
-        texto: message.text,
+        // O back aceita até 500 caracteres; corta o começo e mantém a
+        // pergunta do fim, que ele usa para entender um "sim".
+        texto: message.text.slice(-500),
       }));
 
     const loadingId = `loading-${Date.now()}`;
@@ -709,12 +712,21 @@ export function ChatScreen({ navigation, route }: Props) {
     Keyboard.dismiss();
 
     try {
+      // Na primeira mensagem, o sistema pede a permissão de localização.
+      const localizacao = await obterLocalizacao();
       const resposta = await sugerirLook(
         {
           mensagem: normalizedText,
           historico,
           pecasAnteriores: lookPecas.map((peca) => peca.id),
           pecasRecentes: recentPecaIds.current,
+          localizacao: localizacao ?? undefined,
+          lookMostrado: lookPecas.length
+            ? {
+                pedido: lookPedido.current ?? undefined,
+                ocasiao: lookOcasiao.current ?? undefined,
+              }
+            : undefined,
         },
         accessToken,
       );
@@ -727,20 +739,33 @@ export function ChatScreen({ navigation, route }: Props) {
         resposta.tipo === 'LOOK' || resposta.tipo === 'SEM_LOOK'
           ? resposta.avisos
           : [];
+      // A pergunta fica por último: o back reconhece a resposta ("sim") pelo
+      // fim da mensagem anterior da Zyra.
+      const partes =
+        resposta.tipo === 'LOOK'
+          ? [resposta.mensagem, resposta.clima, ...avisos, resposta.pergunta]
+          : [resposta.mensagem, ...avisos];
       replaceLoadingMessage(
         loadingId,
-        [resposta.mensagem, ...avisos].join('\n\n'),
+        partes.filter((parte): parte is string => !!parte).join('\n\n'),
       );
 
-      if (resposta.tipo === 'LOOK') {
-        // Sem título da IA, um pedido de ajuste ("quero outro", "troca a
-        // calça") mantém o título do look que ele modificou.
-        const tituloDaIa = resposta.titulo?.trim();
+      if (resposta.tipo === 'SALVO') {
+        lookJaSalvo.current = true;
+      }
 
-        lookTitulo.current = tituloDaIa
-          ? formatarTitulo(tituloDaIa)
-          : ((lookPecas.length > 0 ? lookTitulo.current : null) ??
-            formatarTitulo(normalizedText));
+      if (resposta.tipo === 'LOOK') {
+        lookJaSalvo.current = false;
+
+        lookPedido.current = [
+          ...messages
+            .filter((message) => message.author === 'user')
+            .map((message) => message.text),
+          normalizedText,
+        ]
+          .slice(-MENSAGENS_DO_PEDIDO)
+          .join('\n')
+          .slice(-500);
         lookOcasiao.current = resposta.ocasiao ?? null;
 
         recentPecaIds.current = [

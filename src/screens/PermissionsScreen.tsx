@@ -13,6 +13,10 @@ import {
   MediaLibraryPermissionResponse,
   useMediaLibraryPermissions,
 } from 'expo-image-picker';
+import {
+  LocationPermissionResponse,
+  useForegroundPermissions,
+} from 'expo-location';
 
 import {
   PaginaConfiguracoes,
@@ -23,6 +27,7 @@ import { theme } from '../styles/theme';
 
 import CameraIcon from '../../assets/icons/camera.svg';
 import GalleryIcon from '../../assets/icons/photo-svgrepo-com (1).svg';
+import LocationIcon from '../../assets/icons/location.svg';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Permissions'>;
 
@@ -35,10 +40,14 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Permissions'>;
  *
  * Câmera e fotos pedem permissão (as fotos, por decisão da Sophia em
  * 09/10/2026: a CameraColorDetectionScreen pede antes de abrir a galeria).
+ * A localização é pedida pelo chat na primeira mensagem, para a previsão do
+ * tempo; sem ela, o chat funciona igual, só sem o clima.
  */
 export function PermissionsScreen({ navigation }: Props) {
   const [camera, pedirCamera, lerCamera] = useCameraPermissions();
   const [fotos, pedirFotos, lerFotos] = useMediaLibraryPermissions();
+  const [localizacao, pedirLocalizacao, lerLocalizacao] =
+    useForegroundPermissions();
 
   // Quem volta dos Ajustes encontra o estado já atualizado.
   useEffect(() => {
@@ -46,11 +55,12 @@ export function PermissionsScreen({ navigation }: Props) {
       if (estado === 'active') {
         void lerCamera();
         void lerFotos();
+        void lerLocalizacao();
       }
     });
 
     return () => assinatura.remove();
-  }, [lerCamera, lerFotos]);
+  }, [lerCamera, lerFotos, lerLocalizacao]);
 
   async function abrirAjustes() {
     try {
@@ -62,6 +72,7 @@ export function PermissionsScreen({ navigation }: Props) {
 
   const estadoCamera = descrever(camera);
   const estadoFotos = descrever(fotos);
+  const estadoLocalizacao = descrever(localizacao);
 
   return (
     <PaginaConfiguracoes title="Permissões" onBack={() => navigation.goBack()}>
@@ -90,6 +101,19 @@ export function PermissionsScreen({ navigation }: Props) {
           onAbrirAjustes={() => void abrirAjustes()}
         />
       </SecaoPagina>
+
+      <SecaoPagina titulo="Localização">
+        <CartaoPermissao
+          icone={<LocationIcon width={24} height={24} />}
+          nome="Localização"
+          uso="Para o chat ver a previsão do tempo e sugerir looks para o clima. Só a região aproximada é usada."
+          estado={estadoLocalizacao}
+          carregado={Boolean(localizacao)}
+          textoPedir="Permitir localização"
+          onPedir={() => void pedirLocalizacao()}
+          onAbrirAjustes={() => void abrirAjustes()}
+        />
+      </SecaoPagina>
     </PaginaConfiguracoes>
   );
 }
@@ -97,7 +121,11 @@ export function PermissionsScreen({ navigation }: Props) {
 type Estado = { texto: string; permitida: boolean; podePedir: boolean };
 
 function descrever(
-  permissao: PermissionResponse | MediaLibraryPermissionResponse | null,
+  permissao:
+    | PermissionResponse
+    | MediaLibraryPermissionResponse
+    | LocationPermissionResponse
+    | null,
 ): Estado {
   if (!permissao) {
     return { texto: 'Verificando...', permitida: false, podePedir: false };
