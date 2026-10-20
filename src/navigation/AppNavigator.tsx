@@ -154,6 +154,8 @@ export type RootStackParamList = {
     photoUri: string;
     /** Foto da galeria pode ser PNG ou WebP; da câmera, sempre JPEG. */
     photoTipo?: TipoDeImagem;
+    /** A foto é a peça recortada, sem fundo (WebP com transparência). */
+    semFundo?: boolean;
     colorName?: string | null;
     colorAddSymbol?: string | null;
     hex?: string | null;
