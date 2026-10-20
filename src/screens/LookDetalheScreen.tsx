@@ -19,7 +19,7 @@ import Svg, { Path } from 'react-native-svg';
 import { tituloDoLook } from '../components/LookSalvoItem';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { PapelNoLook, PecaDoLook } from '../services/looksApi';
-import { CATEGORIA_LABEL } from '../services/pecasApi';
+import { nomeDaPeca } from '../services/pecasApi';
 import { theme } from '../styles/theme';
 import { getColorAddSymbol } from '../utils/colorAddSymbols';
 import { formatarDataPorExtenso } from '../utils/formatarData';
@@ -45,7 +45,7 @@ function descreverPeca(peca: PecaDoLook) {
 
   return {
     symbol,
-    categoria: CATEGORIA_LABEL[peca.categoria],
+    categoria: nomeDaPeca(peca),
     cor: symbol?.label ?? peca.corNome,
     papel: PAPEL_LABEL[peca.papel],
   };

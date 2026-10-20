@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import { CATEGORIA_LABEL, Peca } from '../services/pecasApi';
+import { nomeDaPeca, Peca } from '../services/pecasApi';
 import { theme } from '../styles/theme';
 import { getColorAddSymbol } from '../utils/colorAddSymbols';
 
@@ -69,7 +69,7 @@ export function PecaExpandida({ peca, onClose }: Props) {
 
   const symbol = getColorAddSymbol(pecaVisivel.colorAddSymbol);
   const nomeCor = symbol?.label ?? pecaVisivel.corNome;
-  const categoria = CATEGORIA_LABEL[pecaVisivel.categoria];
+  const categoria = nomeDaPeca(pecaVisivel);
 
   const symbolSecundario = getColorAddSymbol(
     pecaVisivel.colorAddSymbolSecundario,
