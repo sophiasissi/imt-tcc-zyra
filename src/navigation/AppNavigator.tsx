@@ -34,6 +34,7 @@ import { CapturedClothingScreen } from '../screens/CapturedClothingScreen';
 import { LookDetalheScreen } from '../screens/LookDetalheScreen';
 import { LookSalvo } from '../services/looksApi';
 import { TipoDeImagem } from '../utils/photoUpload';
+import type { TipoDaFoto } from '../services/visionApi';
 
 import { GeneroCadastro, TipoDaltonismoCadastro } from '../constants/perfil';
 
@@ -156,6 +157,8 @@ export type RootStackParamList = {
     photoTipo?: TipoDeImagem;
     /** A foto é a peça recortada, sem fundo (WebP com transparência). */
     semFundo?: boolean;
+    /** Tipo pela foto, para as peças que combinam; null se não houver certeza. */
+    tipoDaPeca?: TipoDaFoto | null;
     colorName?: string | null;
     colorAddSymbol?: string | null;
     hex?: string | null;

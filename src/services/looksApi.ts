@@ -1,6 +1,7 @@
 import { apiRequest } from './api';
 import { Localizacao } from './localizacao';
 import { Ocasiao, Peca } from './pecasApi';
+import type { TipoDaFoto } from './visionApi';
 
 /** Lugar da peça no look: o app usa para ordenar e descrever. */
 export type PapelNoLook =
@@ -113,6 +114,31 @@ export function listarLooks(token: string) {
 export function removerLook(id: string, token: string) {
   return apiRequest<{ message: string }>(`/looks/${id}`, {
     method: 'DELETE',
+    token,
+  });
+}
+
+/** Uma peça do armário que combina com a fotografada, e o motivo. */
+export type SugestaoDeCombinacao = { motivo: string; peca: PecaDoLook };
+
+export type RespostaCombinar =
+  | { status: 'OK'; sugestoes: SugestaoDeCombinacao[] }
+  | { status: 'POUCAS_PECAS' | 'SEM_COMBINACAO'; mensagem: string };
+
+export type CombinarInput = {
+  tipo: TipoDaFoto;
+  corNome: string;
+  hex: string;
+  colorAddSymbol: string;
+  /** Peças já mostradas para esta foto ("Ver outras combinações"). */
+  excluir?: string[];
+};
+
+/** Até duas peças do armário que combinam com a peça recém-fotografada. */
+export function combinarPecas(input: CombinarInput, token: string) {
+  return apiRequest<RespostaCombinar>('/looks/combinar', {
+    method: 'POST',
+    body: JSON.stringify(input),
     token,
   });
 }

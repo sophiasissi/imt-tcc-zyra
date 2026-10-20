@@ -1,10 +1,11 @@
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { LookSalvo } from '../services/looksApi';
 import { theme } from '../styles/theme';
 import { formatarDataPorExtenso } from '../utils/formatarData';
 import { SelectionCircle } from './SelectionCircle';
+import { FotoDaPeca } from './FotoDaPeca';
 
 type Props = {
   look: LookSalvo;
@@ -53,7 +54,7 @@ export function LookSalvoItem({
       accessibilityHint={selecionavel ? undefined : 'Abre as peças do look'}
     >
       {peca ? (
-        <Image source={{ uri: peca.imagemUrl }} style={styles.photo} />
+        <FotoDaPeca uri={peca.imagemMiniUrl} style={styles.photo} />
       ) : (
         <View style={styles.photo} />
       )}

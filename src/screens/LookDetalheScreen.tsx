@@ -12,7 +12,6 @@ import {
   View,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
@@ -23,6 +22,7 @@ import { nomeDaPeca } from '../services/pecasApi';
 import { theme } from '../styles/theme';
 import { getColorAddSymbol } from '../utils/colorAddSymbols';
 import { formatarDataPorExtenso } from '../utils/formatarData';
+import { FotoDaPeca } from '../components/FotoDaPeca';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LookDetalhe'>;
 
@@ -82,12 +82,10 @@ export function LookDetalheScreen({ navigation, route }: Props) {
   }
 
   return (
-    <LinearGradient
-      colors={['#AB003E', '#D66A92', '#FAF9F6']}
-      locations={[0, 0.38, 0.62]}
-      style={styles.screen}
-    >
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+    <View style={styles.screen}>
+      {/* O vermelho da marca só no cabeçalho; as peças, sem fundo, ficam sobre
+          o off-white do app, que não altera como a cor delas é percebida. */}
+      <SafeAreaView style={styles.headerFundo} edges={['top']}>
         <View style={styles.header}>
           {/* Seta e título na mesma linha, centrados entre si; a data fica
               embaixo, alinhada ao título, sem empurrar o título para cima. */}
@@ -123,7 +121,9 @@ export function LookDetalheScreen({ navigation, route }: Props) {
 
           {data ? <Text style={styles.date}>Salvo em {data}</Text> : null}
         </View>
+      </SafeAreaView>
 
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <FlatList
           ref={listRef}
           data={look.pecas}
@@ -147,13 +147,10 @@ export function LookDetalheScreen({ navigation, route }: Props) {
                 accessible
                 accessibilityLabel={`${papel}: ${categoria}, ${cor}`}
               >
-                <View style={styles.photoShadow}>
-                  <Image
-                    source={{ uri: peca.imagemUrl }}
-                    style={[
-                      styles.photo,
-                      { width: fotoLargura, height: fotoAltura },
-                    ]}
+                <View>
+                  <FotoDaPeca
+                    uri={peca.imagemUrl}
+                    style={{ width: fotoLargura, height: fotoAltura }}
                   />
                 </View>
 
@@ -202,8 +199,8 @@ export function LookDetalheScreen({ navigation, route }: Props) {
                     ]}
                     onPress={() => irParaPagina(index)}
                   >
-                    <Image
-                      source={{ uri: peca.imagemUrl }}
+                    <FotoDaPeca
+                      uri={peca.imagemMiniUrl}
                       style={styles.thumbPhoto}
                     />
                   </TouchableOpacity>
@@ -213,28 +210,32 @@ export function LookDetalheScreen({ navigation, route }: Props) {
           </View>
         ) : null}
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  headerFundo: {
+    backgroundColor: '#AB003E',
   },
   safeArea: {
     flex: 1,
   },
   header: {
     paddingHorizontal: PAGE_SIDE,
-    paddingTop: 24,
-    paddingBottom: 20,
+    paddingTop: 16,
+    paddingBottom: 18,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: HEADER_GAP,
   },
-  // Branco sobre o degradê rosa, com a seta na cor do app.
+  // Branco sobre o cabeçalho vermelho, com a seta na cor do app.
   backButton: {
     width: BACK_SIZE,
     height: BACK_SIZE,
@@ -265,22 +266,10 @@ const styles = StyleSheet.create({
   },
   pager: {
     flexGrow: 0,
+    marginTop: 20,
   },
   page: {
     alignItems: 'center',
-  },
-  photoShadow: {
-    borderRadius: 24,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.22,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  photo: {
-    borderRadius: 24,
-    resizeMode: 'cover',
-    backgroundColor: '#EAEAEA',
   },
   // A cor sempre escrita e com o símbolo, nunca só pela foto.
   caption: {
@@ -317,12 +306,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textTransform: 'lowercase',
   },
-  // Centrado no espaço que sobra, com um respiro mínimo da legenda acima.
+  // No pé da tela: o espaço do meio fica para a peça e a legenda da cor.
   footer: {
     flex: 1,
-    justifyContent: 'center',
-    paddingTop: 28,
-    paddingBottom: 12,
+    justifyContent: 'flex-end',
+    paddingTop: 20,
+    paddingBottom: 8,
   },
   counter: {
     color: theme.colors.text,
@@ -353,9 +342,9 @@ const styles = StyleSheet.create({
   thumbInactive: {
     opacity: 0.6,
   },
+  // Véu escuro bem leve: sem ele, a miniatura de peça branca some no off-white.
   thumbPhoto: {
     flex: 1,
-    resizeMode: 'cover',
-    backgroundColor: '#EAEAEA',
+    backgroundColor: 'rgba(0,0,0,0.05)',
   },
 });

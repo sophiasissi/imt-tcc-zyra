@@ -18,7 +18,9 @@ export type Categoria =
   | 'SAIA'
   | 'VESTIDO'
   | 'TENIS'
-  | 'SAPATO';
+  | 'SAPATO'
+  | 'SANDALIA'
+  | 'CHINELO';
 export type Estilo =
   | 'CASUAL'
   | 'SOCIAL'
@@ -67,6 +69,8 @@ export const CATEGORIA_LABEL: Record<Categoria, string> = {
   VESTIDO: 'vestido',
   TENIS: 'tênis',
   SAPATO: 'sapato',
+  SANDALIA: 'sandália',
+  CHINELO: 'chinelo',
 };
 
 export const MATERIAL_LABEL: Record<Material, string> = {
@@ -160,6 +164,8 @@ export type Peca = {
   usuarioId: string;
   /** URL assinada, válida por cerca de uma hora. */
   imagemUrl: string;
+  /** Miniatura (~30 KB) para os cards; a foto inteira nas peças antigas. */
+  imagemMiniUrl: string;
   categoria: Categoria;
   estilo: Estilo | null;
   estampa: Estampa | null;

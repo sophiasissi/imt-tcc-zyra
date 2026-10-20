@@ -29,6 +29,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ApiError } from '../services/api';
 import { listarPecas, Peca, removerPeca } from '../services/pecasApi';
 import { listarLooks, LookSalvo, removerLook } from '../services/looksApi';
+import { CarrosselDeLooks } from '../components/CarrosselDeLooks';
 import { FotoPerfil } from '../components/FotoPerfil';
 import { ClosetItemCard } from '../components/ClosetItemCard';
 import { GradientPillButton } from '../components/GradientPillButton';
@@ -38,7 +39,6 @@ import { ZyraPopup } from '../components/ZyraPopup';
 
 import CameraSvg from '../../assets/icons/camera.svg';
 import LogoColorADD from '../../assets/icons/logo_ColorADD.svg';
-import ClothesHome from '../../assets/images/clothes_home.svg';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -573,7 +573,7 @@ export function HomeScreen({ navigation, route }: Props) {
 
       <View style={styles.heroViewport}>
         <View style={styles.hero}>
-          <ClothesHome width={301} height={383} />
+          <CarrosselDeLooks largura={301} altura={383} />
         </View>
       </View>
 

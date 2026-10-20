@@ -12,6 +12,7 @@ import { nomeDaPeca, Peca } from '../services/pecasApi';
 import { theme } from '../styles/theme';
 import { getColorAddSymbol } from '../utils/colorAddSymbols';
 import { SelectionCircle } from './SelectionCircle';
+import { FotoDaPeca } from './FotoDaPeca';
 
 type Props = {
   peca: Peca;
@@ -43,7 +44,7 @@ export function ClosetItemCard({
 
   const conteudo = (
     <>
-      <Image source={{ uri: peca.imagemUrl }} style={styles.photo} />
+      <FotoDaPeca uri={peca.imagemMiniUrl} style={styles.photo} />
 
       {nomeCor ? (
         <View style={styles.colorTag}>
@@ -97,14 +98,14 @@ const styles = StyleSheet.create({
     width: '32%',
     height: 140,
     borderRadius: 10,
-    backgroundColor: '#F8F6F4',
+    // Quase transparente: a peça sem fundo se destaca sobre o grafite do
+    // armário. Um véu claro bem leve fica, para as peças pretas não sumirem.
+    backgroundColor: 'rgba(255,255,255,0.1)',
     overflow: 'hidden',
   },
   photo: {
     flex: 1,
     width: '100%',
-    resizeMode: 'cover',
-    backgroundColor: '#EAEAEA',
   },
   colorTag: {
     flexDirection: 'row',
