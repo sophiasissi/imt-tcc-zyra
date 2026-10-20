@@ -8,6 +8,10 @@ type ColorAddSymbolData = {
 // Cópias de 144 px dos símbolos de assets/coloradd/preto (3x o maior tamanho
 // em que aparecem, 46 px na câmera). Os originais têm 568 a 1024 px e
 // demoravam para aparecer em toda tela com símbolo.
+//
+// São só os 27 símbolos oficiais. O manual de normas gráficas (2.4) proíbe
+// criar ou alterar símbolos: rosa é vermelho claro ou roxo claro, e cinza é
+// claro ou escuro. A visão já devolve só esses códigos.
 const amareloClaro = require('../../assets/coloradd/app/simbolos/amarelo claro.png');
 const amareloEscuro = require('../../assets/coloradd/app/simbolos/amarelo escuro.png');
 const amarelo = require('../../assets/coloradd/app/simbolos/amarelo.png');
@@ -24,7 +28,6 @@ const castanho = require('../../assets/coloradd/app/simbolos/castanho.png');
 
 const cinzaClaro = require('../../assets/coloradd/app/simbolos/cinza claro.png');
 const cinzaEscuro = require('../../assets/coloradd/app/simbolos/cinza escuro.png');
-const cinza = require('../../assets/coloradd/app/simbolos/cinza.png');
 
 const dourado = require('../../assets/coloradd/app/simbolos/dourado.png');
 
@@ -34,10 +37,6 @@ const laranja = require('../../assets/coloradd/app/simbolos/laranja.png');
 
 const prateado = require('../../assets/coloradd/app/simbolos/prateado.png');
 const preto = require('../../assets/coloradd/app/simbolos/preto.png');
-
-const rosaClaro = require('../../assets/coloradd/app/simbolos/rosa claro.png');
-const rosaEscuro = require('../../assets/coloradd/app/simbolos/rosa escuro.png');
-const rosa = require('../../assets/coloradd/app/simbolos/rosa.png');
 
 const roxoClaro = require('../../assets/coloradd/app/simbolos/roxo claro.png');
 const roxoEscuro = require('../../assets/coloradd/app/simbolos/roxo escuro.png');
@@ -104,10 +103,6 @@ const symbolMap: Record<string, ColorAddSymbolData> = {
     label: 'cinza escuro',
     image: cinzaEscuro,
   },
-  CINZA: {
-    label: 'cinza',
-    image: cinza,
-  },
 
   DOURADO: {
     label: 'dourado',
@@ -135,19 +130,6 @@ const symbolMap: Record<string, ColorAddSymbolData> = {
   PRETO: {
     label: 'preto',
     image: preto,
-  },
-
-  ROSA_CLARO: {
-    label: 'rosa claro',
-    image: rosaClaro,
-  },
-  ROSA_ESCURO: {
-    label: 'rosa escuro',
-    image: rosaEscuro,
-  },
-  ROSA: {
-    label: 'rosa',
-    image: rosa,
   },
 
   ROXO_CLARO: {
