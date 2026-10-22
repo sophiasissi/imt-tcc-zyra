@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import React from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import Svg, {
   Defs,
@@ -27,9 +28,15 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { theme } from '../styles/theme';
 import { useAuth } from '../contexts/AuthContext';
 import { ApiError } from '../services/api';
-import { listarPecas, Peca, removerPeca } from '../services/pecasApi';
+import {
+  Categoria,
+  listarPecas,
+  Peca,
+  removerPeca,
+} from '../services/pecasApi';
 import { listarLooks, LookSalvo, removerLook } from '../services/looksApi';
 import { CarrosselDeLooks } from '../components/CarrosselDeLooks';
+import { FiltroCategorias } from '../components/FiltroCategorias';
 import { FotoPerfil } from '../components/FotoPerfil';
 import { ClosetItemCard } from '../components/ClosetItemCard';
 import { GradientPillButton } from '../components/GradientPillButton';
@@ -92,6 +99,21 @@ function BookmarkIcon() {
   );
 }
 
+/** Funil: abre o filtro do armário por categoria. */
+function FunilIcon({ cor }: { cor: string }) {
+  return (
+    <Svg width={14} height={14} viewBox="0 0 24 24">
+      <Path
+        d="M3 4.5h18l-7 8.5v6l-4 2v-8L3 4.5z"
+        stroke={cor}
+        strokeWidth={2.2}
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </Svg>
+  );
+}
+
 /** Cabide: volta da galeria para as peças do armário. */
 function HangerIcon() {
   return (
@@ -118,6 +140,11 @@ export function HomeScreen({ navigation, route }: Props) {
   const [pecasError, setPecasError] = React.useState<string | null>(null);
 
   const [modo, setModo] = React.useState<ModoPainel>('armario');
+  // Filtro do armário por categoria (vazio = todas).
+  const [isFiltroAberto, setIsFiltroAberto] = React.useState(false);
+  const [categoriasFiltro, setCategoriasFiltro] = React.useState<Categoria[]>(
+    [],
+  );
   const [looks, setLooks] = React.useState<LookSalvo[]>([]);
   const [isLoadingLooks, setIsLoadingLooks] = React.useState(true);
   const [looksError, setLooksError] = React.useState<string | null>(null);
@@ -399,9 +426,29 @@ export function HomeScreen({ navigation, route }: Props) {
     setModo((atual) => (atual === 'galeria' ? 'armario' : 'galeria'));
   }
 
+  // Fechar o filtro volta a mostrar todas as peças: o filtro só vale enquanto
+  // a faixa de categorias está à vista.
+  function handleAlternarFiltro() {
+    if (isFiltroAberto) {
+      setCategoriasFiltro([]);
+    }
+
+    setIsFiltroAberto(!isFiltroAberto);
+  }
+
   function handleAbrirLook(look: LookSalvo) {
     navigation.navigate('LookDetalhe', { look });
   }
+
+  // Só valem as categorias que ainda têm peça: se a pessoa excluir a última
+  // camiseta, "Camiseta" sai do filtro em vez de deixar o armário vazio.
+  const filtroAtivo = categoriasFiltro.filter((categoria) =>
+    pecas.some((peca) => peca.categoria === categoria),
+  );
+  const pecasVisiveis =
+    filtroAtivo.length > 0
+      ? pecas.filter((peca) => filtroAtivo.includes(peca.categoria))
+      : pecas;
 
   // Peças marcadas que estão em looks salvos: esses looks saem junto.
   const looksAfetados = pecas
@@ -636,7 +683,7 @@ export function HomeScreen({ navigation, route }: Props) {
                 ? tituloDaSelecao(selecionados.length, modo)
                 : modo === 'galeria'
                   ? 'Galeria de Looks'
-                  : 'Seu Armário Digital'}
+                  : 'Armário Digital'}
             </Text>
 
             <View style={styles.closetActions}>
@@ -653,6 +700,38 @@ export function HomeScreen({ navigation, route }: Props) {
                   icon={modo === 'galeria' ? <HangerIcon /> : <BookmarkIcon />}
                   onPress={handleAlternarGaleria}
                 />
+              ) : null}
+
+              {!isSelecionando && modo === 'armario' && pecas.length > 0 ? (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    isFiltroAberto
+                      ? 'Fechar filtro e mostrar todas as peças'
+                      : 'Filtrar peças por categoria'
+                  }
+                  accessibilityState={{ expanded: isFiltroAberto }}
+                  activeOpacity={0.84}
+                  style={styles.filtroButton}
+                  onPress={handleAlternarFiltro}
+                >
+                  {/* Aberto, fica com o degradê do botão da Galeria. */}
+                  {isFiltroAberto ? (
+                    <LinearGradient
+                      colors={theme.gradientPrimary.colors}
+                      locations={theme.gradientPrimary.locations}
+                      start={theme.gradientPrimary.start}
+                      end={theme.gradientPrimary.end}
+                      style={StyleSheet.absoluteFill}
+                    />
+                  ) : null}
+
+                  <FunilIcon
+                    cor={
+                      isFiltroAberto ? theme.colors.white : theme.colors.text
+                    }
+                  />
+                </TouchableOpacity>
               ) : null}
 
               {/* Lista vazia não tem o que selecionar. */}
@@ -678,6 +757,14 @@ export function HomeScreen({ navigation, route }: Props) {
               ) : null}
             </View>
           </View>
+
+          {isFiltroAberto && modo === 'armario' && pecas.length > 0 ? (
+            <FiltroCategorias
+              pecas={pecas}
+              selecionadas={filtroAtivo}
+              onChange={setCategoriasFiltro}
+            />
+          ) : null}
 
           {modo === 'galeria' ? (
             isLoadingLooks && looks.length === 0 ? (
@@ -720,12 +807,16 @@ export function HomeScreen({ navigation, route }: Props) {
               {pecasError ??
                 'Seu armário ainda está vazio. Toque na câmera, fotografe uma peça e cadastre.'}
             </Text>
+          ) : pecasVisiveis.length === 0 ? (
+            <Text style={[styles.closetEmptyText, styles.closetFeedback]}>
+              Nenhuma peça dessas categorias no seu armário.
+            </Text>
           ) : (
             <ScrollView
               contentContainerStyle={styles.clothingGrid}
               showsVerticalScrollIndicator={false}
             >
-              {pecas.map((peca) => (
+              {pecasVisiveis.map((peca) => (
                 <ClosetItemCard
                   key={peca.id}
                   peca={peca}
@@ -989,6 +1080,18 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontFamily: theme.fonts.regular,
     fontSize: 12,
+  },
+  filtroButton: {
+    backgroundColor: theme.colors.white,
+    borderRadius: 30,
+    minWidth: 30,
+    height: 30,
+    paddingHorizontal: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    overflow: 'hidden',
   },
   closetActions: {
     flexDirection: 'row',
