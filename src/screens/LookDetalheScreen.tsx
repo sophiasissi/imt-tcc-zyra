@@ -15,14 +15,17 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
+import { ClosetItemCard } from '../components/ClosetItemCard';
+import { FotoDaPeca } from '../components/FotoDaPeca';
+import { cabeNaColagem, LookColagem } from '../components/LookColagem';
 import { tituloDoLook } from '../components/LookSalvoItem';
+import { PecaExpandida } from '../components/PecaExpandida';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { PapelNoLook, PecaDoLook } from '../services/looksApi';
 import { nomeDaPeca } from '../services/pecasApi';
 import { theme } from '../styles/theme';
 import { getColorAddSymbol } from '../utils/colorAddSymbols';
 import { formatarDataPorExtenso } from '../utils/formatarData';
-import { FotoDaPeca } from '../components/FotoDaPeca';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LookDetalhe'>;
 
@@ -39,6 +42,18 @@ const PAGE_SIDE = 24;
 const THUMB_SIZE = 56;
 const BACK_SIZE = 36;
 const HEADER_GAP = 14;
+const GRID_GAP = 10;
+// Altura da legenda embaixo da foto (margem + faixa branca).
+const LEGENDA_ALTURA = 84;
+// Look montado: margem dos lados, altura máxima em relação à largura (mais
+// alto que isso, as peças se afastam demais) e quanto as peças crescem em
+// relação ao molde do chat. Ajuste estes três para mudar o tamanho do look.
+const LOOK_SIDE = 12;
+const LOOK_PROPORCAO_MAXIMA = 1.3;
+const ESCALA_DAS_PECAS = 1.12;
+
+/** Primeira página: o look montado; as outras, uma peça cada. */
+type Pagina = { tipo: 'look' } | { tipo: 'peca'; peca: PecaDoLook };
 
 function descreverPeca(peca: PecaDoLook) {
   const symbol = getColorAddSymbol(peca.colorAddSymbol);
@@ -52,33 +67,133 @@ function descreverPeca(peca: PecaDoLook) {
 }
 
 /**
- * Look salvo em tela cheia: uma peça por página, grande, com a cor escrita e
- * o símbolo ColorADD; embaixo, as miniaturas de todas as peças para pular
- * direto para uma delas.
+ * Look salvo em tela cheia. A primeira página é o look montado igual ao do
+ * chat (tocar numa peça abre ela ampliada); deslizando, uma peça por página,
+ * grande, com a cor escrita e o símbolo ColorADD. Embaixo, as miniaturas para
+ * pular direto para o look ou para uma peça.
  */
 export function LookDetalheScreen({ navigation, route }: Props) {
   const { look } = route.params;
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
-  const listRef = React.useRef<FlatList<PecaDoLook>>(null);
+  const listRef = React.useRef<FlatList<Pagina>>(null);
   const [paginaAtual, setPaginaAtual] = React.useState(0);
+  // Altura livre entre o cabeçalho e as miniaturas, medida na tela.
+  const [alturaLivre, setAlturaLivre] = React.useState(0);
+  const [pecaAberta, setPecaAberta] = React.useState<PecaDoLook | null>(null);
 
   const titulo = tituloDoLook(look);
   const data = formatarDataPorExtenso(look.criadoEm);
   const total = look.pecas.length;
+  const paginas: Pagina[] = [
+    { tipo: 'look' },
+    ...look.pecas.map((peca) => ({ tipo: 'peca' as const, peca })),
+  ];
 
-  // Foto do maior tamanho que deixa título, legenda e miniaturas visíveis.
+  // Foto da peça do maior tamanho que cabe com a legenda. Antes da medição,
+  // uma estimativa, para a primeira renderização não piscar vazia.
+  const alturaDaPagina = alturaLivre || screenHeight * 0.5;
   const fotoLargura = screenWidth - PAGE_SIDE * 2;
-  const fotoAltura = Math.min(fotoLargura * 1.2, screenHeight * 0.44);
+  const fotoAltura = Math.max(
+    Math.min(fotoLargura * 1.4, alturaDaPagina - LEGENDA_ALTURA),
+    120,
+  );
+
+  // Look montado com os mesmos moldes do chat, numa área mais alta e com as
+  // peças aumentadas: a disposição é a mesma, só que maior.
+  const areaDoLook = {
+    largura: screenWidth - LOOK_SIDE * 2,
+    altura: Math.min(
+      alturaDaPagina,
+      (screenWidth - LOOK_SIDE * 2) * LOOK_PROPORCAO_MAXIMA,
+    ),
+  };
+  const colagem = cabeNaColagem(look.pecas);
+
+  // Cards (look com alguma peça com fundo) em duas colunas, do maior tamanho
+  // que cabe na página.
+  const colunas = total > 1 ? 2 : 1;
+  const linhas = Math.max(Math.ceil(total / colunas), 1);
+  const cardLargura = (fotoLargura - GRID_GAP * (colunas - 1)) / colunas;
+  const cardAltura = Math.min(
+    (alturaDaPagina - GRID_GAP * (linhas - 1)) / linhas,
+    cardLargura * 1.35,
+  );
+  const cardTamanho = {
+    width: Math.min(cardLargura, cardAltura),
+    height: cardAltura,
+  };
 
   function handleScrollEnd(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const pagina = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
-    setPaginaAtual(Math.max(0, Math.min(pagina, total - 1)));
+    setPaginaAtual(Math.max(0, Math.min(pagina, paginas.length - 1)));
   }
 
   function irParaPagina(index: number) {
     listRef.current?.scrollToIndex({ index, animated: true });
     setPaginaAtual(index);
+  }
+
+  function renderLook() {
+    return (
+      <View
+        style={[styles.page, { width: screenWidth, height: alturaDaPagina }]}
+        accessibilityLabel="Look completo"
+      >
+        {colagem ? (
+          <LookColagem
+            pecas={look.pecas}
+            largura={areaDoLook.largura}
+            altura={areaDoLook.altura}
+            onPressPeca={setPecaAberta}
+            escalaDasPecas={ESCALA_DAS_PECAS}
+          />
+        ) : (
+          <View style={[styles.grid, { width: fotoLargura }]}>
+            {look.pecas.map((peca) => (
+              <ClosetItemCard
+                key={peca.id}
+                peca={peca}
+                style={[cardTamanho, styles.card]}
+                onPress={() => setPecaAberta(peca)}
+              />
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  function renderPeca(peca: PecaDoLook) {
+    const { symbol, categoria, cor, papel } = descreverPeca(peca);
+
+    return (
+      <View
+        style={[styles.page, { width: screenWidth, height: alturaDaPagina }]}
+        accessible
+        accessibilityLabel={`${papel}: ${categoria}, ${cor}`}
+      >
+        <View>
+          <FotoDaPeca
+            uri={peca.imagemUrl}
+            style={{ width: fotoLargura, height: fotoAltura }}
+          />
+        </View>
+
+        <View style={[styles.caption, { width: fotoLargura }]}>
+          {symbol ? (
+            <Image source={symbol.image} style={styles.captionSymbol} />
+          ) : null}
+
+          <View style={styles.captionTexts}>
+            <Text style={styles.captionPapel}>{papel}</Text>
+            <Text style={styles.captionPeca} numberOfLines={1}>
+              {categoria} {cor}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
   }
 
   return (
@@ -124,92 +239,89 @@ export function LookDetalheScreen({ navigation, route }: Props) {
       </SafeAreaView>
 
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <FlatList
-          ref={listRef}
-          data={look.pecas}
-          keyExtractor={(peca) => peca.id}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={handleScrollEnd}
-          getItemLayout={(_, index) => ({
-            length: screenWidth,
-            offset: screenWidth * index,
-            index,
-          })}
-          style={styles.pager}
-          renderItem={({ item: peca }) => {
-            const { symbol, categoria, cor, papel } = descreverPeca(peca);
+        {/* O espaço entre o cabeçalho e as miniaturas é todo das páginas. */}
+        <View
+          style={styles.pagerArea}
+          onLayout={(event) => setAlturaLivre(event.nativeEvent.layout.height)}
+        >
+          <FlatList
+            ref={listRef}
+            data={paginas}
+            keyExtractor={(pagina) =>
+              pagina.tipo === 'look' ? 'look' : pagina.peca.id
+            }
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={handleScrollEnd}
+            getItemLayout={(_, index) => ({
+              length: screenWidth,
+              offset: screenWidth * index,
+              index,
+            })}
+            style={styles.pager}
+            renderItem={({ item: pagina }) =>
+              pagina.tipo === 'look' ? renderLook() : renderPeca(pagina.peca)
+            }
+          />
+        </View>
 
-            return (
-              <View
-                style={[styles.page, { width: screenWidth }]}
-                accessible
-                accessibilityLabel={`${papel}: ${categoria}, ${cor}`}
-              >
-                <View>
-                  <FotoDaPeca
-                    uri={peca.imagemUrl}
-                    style={{ width: fotoLargura, height: fotoAltura }}
-                  />
-                </View>
+        <View style={styles.footer}>
+          <Text style={styles.counter} accessibilityLiveRegion="polite">
+            {paginaAtual === 0
+              ? 'Look completo · toque numa peça para ver os detalhes'
+              : `Peça ${paginaAtual} de ${total}`}
+          </Text>
 
-                <View style={[styles.caption, { width: fotoLargura }]}>
-                  {symbol ? (
-                    <Image source={symbol.image} style={styles.captionSymbol} />
-                  ) : null}
-
-                  <View style={styles.captionTexts}>
-                    <Text style={styles.captionPapel}>{papel}</Text>
-                    <Text style={styles.captionPeca} numberOfLines={1}>
-                      {categoria} {cor}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            );
-          }}
-        />
-
-        {total > 1 ? (
-          <View style={styles.footer}>
-            <Text style={styles.counter} accessibilityLiveRegion="polite">
-              Peça {paginaAtual + 1} de {total}
-            </Text>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.thumbs}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.thumbs}
+          >
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Ver o look completo"
+              accessibilityState={{ selected: paginaAtual === 0 }}
+              activeOpacity={0.8}
+              style={[
+                styles.thumb,
+                styles.thumbLook,
+                paginaAtual === 0 ? styles.thumbActive : styles.thumbInactive,
+              ]}
+              onPress={() => irParaPagina(0)}
             >
-              {look.pecas.map((peca, index) => {
-                const { categoria, cor } = descreverPeca(peca);
-                const ativa = index === paginaAtual;
+              <Text style={styles.thumbLookText}>Look</Text>
+            </TouchableOpacity>
 
-                return (
-                  <TouchableOpacity
-                    key={peca.id}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Ver ${categoria} ${cor}`}
-                    accessibilityState={{ selected: ativa }}
-                    activeOpacity={0.8}
-                    style={[
-                      styles.thumb,
-                      ativa ? styles.thumbActive : styles.thumbInactive,
-                    ]}
-                    onPress={() => irParaPagina(index)}
-                  >
-                    <FotoDaPeca
-                      uri={peca.imagemMiniUrl}
-                      style={styles.thumbPhoto}
-                    />
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        ) : null}
+            {look.pecas.map((peca, index) => {
+              const { categoria, cor } = descreverPeca(peca);
+              const ativa = index + 1 === paginaAtual;
+
+              return (
+                <TouchableOpacity
+                  key={peca.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ver ${categoria} ${cor}`}
+                  accessibilityState={{ selected: ativa }}
+                  activeOpacity={0.8}
+                  style={[
+                    styles.thumb,
+                    ativa ? styles.thumbActive : styles.thumbInactive,
+                  ]}
+                  onPress={() => irParaPagina(index + 1)}
+                >
+                  <FotoDaPeca
+                    uri={peca.imagemMiniUrl}
+                    style={styles.thumbPhoto}
+                  />
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
       </SafeAreaView>
+
+      <PecaExpandida peca={pecaAberta} onClose={() => setPecaAberta(null)} />
     </View>
   );
 }
@@ -264,12 +376,28 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginLeft: BACK_SIZE + HEADER_GAP,
   },
+  pagerArea: {
+    flex: 1,
+    marginTop: 16,
+  },
   pager: {
     flexGrow: 0,
-    marginTop: 20,
   },
+  // Conteúdo centrado na altura livre: a sobra fica dividida em cima e embaixo.
   page: {
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: GRID_GAP,
+  },
+  // Véu escuro leve, como no chat: sem ele, as peças brancas sem fundo
+  // sumiriam no off-white.
+  card: {
+    backgroundColor: 'rgba(0,0,0,0.05)',
   },
   // A cor sempre escrita e com o símbolo, nunca só pela foto.
   caption: {
@@ -306,11 +434,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textTransform: 'lowercase',
   },
-  // No pé da tela: o espaço do meio fica para a peça e a legenda da cor.
   footer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    paddingTop: 20,
+    paddingTop: 12,
     paddingBottom: 8,
   },
   counter: {
@@ -334,6 +459,17 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     padding: 0,
     overflow: 'hidden',
+  },
+  // Miniatura do look montado: texto em vez de foto.
+  thumbLook: {
+    backgroundColor: theme.colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  thumbLookText: {
+    color: theme.colors.primary,
+    fontFamily: theme.fonts.bold,
+    fontSize: 13,
   },
   // Borda na ativa e as outras esmaecidas: a marcação não depende só da cor.
   thumbActive: {

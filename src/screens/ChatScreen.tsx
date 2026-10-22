@@ -27,6 +27,7 @@ import Svg, { Path } from 'react-native-svg';
 
 import { ClosetItemCard } from '../components/ClosetItemCard';
 import { cabeNaColagem, LookColagem } from '../components/LookColagem';
+import { PecaExpandida } from '../components/PecaExpandida';
 import { ZyraPopup } from '../components/ZyraPopup';
 import { useAuth } from '../contexts/AuthContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -101,6 +102,17 @@ type DialogoSalvar =
 const ERRO_PADRAO =
   'Não consegui montar o look agora. Tente de novo em instantes.';
 
+/** Área inteira acima do chat, para a colagem do look. */
+function areaDoLookNoChat(screenWidth: number, screenHeight: number) {
+  return {
+    largura: screenWidth - LOOK_AREA_SIDE * 2,
+    altura: Math.max(
+      screenHeight - LOOK_AREA_TOP - COLLAPSED_PANEL_HEIGHT - 10,
+      240,
+    ),
+  };
+}
+
 export function ChatScreen({ navigation, route }: Props) {
   // Armário aberto na Home: o painel já está no topo. O chat nasce ali mesmo e
   // só troca o conteúdo, sem a barra branca subir ou descer.
@@ -153,6 +165,8 @@ export function ChatScreen({ navigation, route }: Props) {
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [isLookReady, setIsLookReady] = React.useState(false);
   const [lookPecas, setLookPecas] = React.useState<PecaDoLook[]>([]);
+  // Peça do look tocada: abre ampliada, como no armário da Home.
+  const [pecaAberta, setPecaAberta] = React.useState<PecaDoLook | null>(null);
   const [dialogoSalvar, setDialogoSalvar] =
     React.useState<DialogoSalvar | null>(null);
   const [isSalvando, setIsSalvando] = React.useState(false);
@@ -671,14 +685,7 @@ export function ChatScreen({ navigation, route }: Props) {
     return { width: Math.min(largura, altura), height: altura };
   }, [lookPecas.length, screenHeight, screenWidth]);
 
-  // Área inteira acima do chat, para a colagem do look.
-  const areaDoLook = {
-    largura: screenWidth - LOOK_AREA_SIDE * 2,
-    altura: Math.max(
-      screenHeight - LOOK_AREA_TOP - COLLAPSED_PANEL_HEIGHT - 10,
-      240,
-    ),
-  };
+  const areaDoLook = areaDoLookNoChat(screenWidth, screenHeight);
 
   async function handleSend() {
     const normalizedText = inputText.trim();
@@ -854,6 +861,7 @@ export function ChatScreen({ navigation, route }: Props) {
                 pecas={lookPecas}
                 largura={areaDoLook.largura}
                 altura={areaDoLook.altura}
+                onPressPeca={setPecaAberta}
               />
             </View>
           ) : (
@@ -867,6 +875,7 @@ export function ChatScreen({ navigation, route }: Props) {
                   key={peca.id}
                   peca={peca}
                   style={[lookCardSize, styles.lookCard]}
+                  onPress={() => setPecaAberta(peca)}
                 />
               ))}
             </ScrollView>
@@ -1050,6 +1059,8 @@ export function ChatScreen({ navigation, route }: Props) {
           )}
         </View>
       </Animated.View>
+
+      <PecaExpandida peca={pecaAberta} onClose={() => setPecaAberta(null)} />
 
       {/* Um popup só, que troca de conteúdo: no iOS, um Modal abrindo
             enquanto outro fecha às vezes não aparece. */}
