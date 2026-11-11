@@ -248,6 +248,8 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.3,
         base64: false,
+        // Sem o clique a cada 800 ms (Android).
+        shutterSound: false,
       });
 
       if (!photo?.uri || !isScreenActiveRef.current) {
@@ -826,6 +828,11 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
         ref={cameraRef}
         style={[styles.camera, previewFrame]}
         facing={facing}
+        // Sem a animação de obturador: a leitura de cor tira uma foto a cada
+        // 800 ms, e a prévia piscava a cada uma. O expo-camera 58 consertou a
+        // animação no iOS (antes ela não funcionava), e ela vem ligada. Na foto
+        // de cadastro, a imagem congelada já mostra que a foto foi tirada.
+        animateShutter={false}
         // iOS: desliga a sessão da câmera fora de foco (economiza bateria).
         active={isFocused}
         // iOS: fotos em Full HD em vez da resolução máxima do sensor (12 a
@@ -841,7 +848,9 @@ export function CameraColorDetectionScreen({ navigation }: Props) {
         ratio="4:3"
         // Sem valor, o iOS usa a lente principal (1x).
         selectedLens={lente === '0.5x' ? ultraAngular : undefined}
-        onAvailableLensesChanged={(event) => setLentesDisponiveis(event.lenses)}
+        onAvailableLensesChanged={(event) =>
+          setLentesDisponiveis(event.lenses.map((lente) => lente.deviceType))
+        }
         onCameraReady={() => setIsCameraReady(true)}
       />
 

@@ -10,8 +10,9 @@ const CATEGORIAS = Object.keys(CATEGORIA_LABEL) as Categoria[];
 
 type Props = {
   pecas: Peca[];
-  selecionadas: Categoria[];
-  onChange: (categorias: Categoria[]) => void;
+  /** null = todas as categorias. */
+  selecionada: Categoria | null;
+  onChange: (categoria: Categoria | null) => void;
 };
 
 function capitalizar(texto: string) {
@@ -19,32 +20,26 @@ function capitalizar(texto: string) {
 }
 
 /**
- * Faixa de categorias do armário, rolando para o lado. Dá para marcar várias;
- * "Todas" limpa o filtro. Cada opção mostra quantas peças a pessoa tem dela.
+ * Faixa de categorias do armário, rolando para o lado. Uma categoria por vez
+ * (pedido da Sophia, 23/10/2026): tocar em outra troca o filtro, e "Todas"
+ * volta a mostrar o armário inteiro. Cada opção mostra quantas peças a pessoa
+ * tem dela.
  */
-export function FiltroCategorias({ pecas, selecionadas, onChange }: Props) {
-  function alternar(categoria: Categoria) {
-    onChange(
-      selecionadas.includes(categoria)
-        ? selecionadas.filter((c) => c !== categoria)
-        : [...selecionadas, categoria],
-    );
-  }
-
+export function FiltroCategorias({ pecas, selecionada, onChange }: Props) {
   const opcoes = [
     {
       chave: 'TODAS',
       texto: 'Todas',
       quantidade: pecas.length,
-      marcada: selecionadas.length === 0,
-      onPress: () => onChange([]),
+      marcada: selecionada === null,
+      onPress: () => onChange(null),
     },
     ...CATEGORIAS.map((categoria) => ({
       chave: categoria,
       texto: capitalizar(CATEGORIA_LABEL[categoria]),
       quantidade: pecas.filter((peca) => peca.categoria === categoria).length,
-      marcada: selecionadas.includes(categoria),
-      onPress: () => alternar(categoria),
+      marcada: selecionada === categoria,
+      onPress: () => onChange(categoria),
     })).filter(({ quantidade }) => quantidade > 0),
   ];
 
@@ -54,12 +49,14 @@ export function FiltroCategorias({ pecas, selecionadas, onChange }: Props) {
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.lista}
       style={styles.faixa}
+      accessibilityRole="radiogroup"
+      accessibilityLabel="Filtrar por categoria"
     >
       {opcoes.map(({ chave, texto, quantidade, marcada, onPress }) => (
         <TouchableOpacity
           key={chave}
-          accessibilityRole="button"
-          accessibilityState={{ selected: marcada }}
+          accessibilityRole="radio"
+          accessibilityState={{ checked: marcada }}
           accessibilityLabel={`${texto}, ${quantidade} ${quantidade === 1 ? 'peça' : 'peças'}`}
           activeOpacity={0.84}
           onPress={onPress}

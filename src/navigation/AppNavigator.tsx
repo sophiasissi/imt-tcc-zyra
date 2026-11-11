@@ -115,6 +115,8 @@ export type RootStackParamList = {
     | {
         /** Instante em que o chat salvou um look: a Home mostra o aviso. */
         lookSalvoEm?: number;
+        /** O look já estava salvo e só voltou para o topo da galeria. */
+        lookJaEstavaSalvo?: boolean;
       }
     | undefined;
 

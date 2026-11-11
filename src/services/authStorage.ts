@@ -8,6 +8,31 @@ const TOKEN_TYPE_KEY = 'zyra.auth.tokenType';
 const PROFILE_KEY = 'zyra.auth.profile';
 const EXPIRES_AT_KEY = 'zyra.auth.expiresAt';
 
+/**
+ * O padrão do iOS (WHEN_UNLOCKED) só libera o keychain com a tela
+ * destravada. Com AFTER_FIRST_UNLOCK, ele fica disponível depois do primeiro
+ * desbloqueio do aparelho, mesmo que o app renove o token ao voltar do
+ * segundo plano. A busca no keychain não usa esta opção, então os itens
+ * gravados antes continuam sendo lidos e passam a ela na próxima gravação.
+ */
+const OPCOES_KEYCHAIN: SecureStore.SecureStoreOptions = {
+  keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
+};
+
+/**
+ * Grava no keychain com uma nova tentativa. O iOS às vezes responde "No
+ * keychain is available" por um instante (na sexta do evento, ao renovar o
+ * token); na segunda tentativa costuma funcionar.
+ */
+async function gravar(chave: string, valor: string) {
+  try {
+    await SecureStore.setItemAsync(chave, valor, OPCOES_KEYCHAIN);
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await SecureStore.setItemAsync(chave, valor, OPCOES_KEYCHAIN);
+  }
+}
+
 export type StoredAuthTokens = {
   accessToken: string;
   idToken: string;
@@ -40,12 +65,12 @@ export async function saveAuthTokens(tokens: StoredAuthTokens) {
     (tokens.expiresIn > 0 ? Date.now() + tokens.expiresIn * 1000 : 0);
 
   await Promise.all([
-    SecureStore.setItemAsync(ACCESS_TOKEN_KEY, tokens.accessToken),
-    SecureStore.setItemAsync(ID_TOKEN_KEY, tokens.idToken),
-    SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refreshToken),
-    SecureStore.setItemAsync(EXPIRES_IN_KEY, String(tokens.expiresIn)),
-    SecureStore.setItemAsync(TOKEN_TYPE_KEY, tokens.tokenType),
-    SecureStore.setItemAsync(EXPIRES_AT_KEY, String(expiresAt)),
+    gravar(ACCESS_TOKEN_KEY, tokens.accessToken),
+    gravar(ID_TOKEN_KEY, tokens.idToken),
+    gravar(REFRESH_TOKEN_KEY, tokens.refreshToken),
+    gravar(EXPIRES_IN_KEY, String(tokens.expiresIn)),
+    gravar(TOKEN_TYPE_KEY, tokens.tokenType),
+    gravar(EXPIRES_AT_KEY, String(expiresAt)),
   ]);
 }
 
@@ -98,7 +123,7 @@ export async function clearAuthTokens() {
  */
 export async function saveCachedProfile(profile: unknown) {
   try {
-    await SecureStore.setItemAsync(PROFILE_KEY, JSON.stringify(profile));
+    await gravar(PROFILE_KEY, JSON.stringify(profile));
   } catch (error) {
     // Cache é melhor-esforço: se falhar, o app segue buscando na API.
     console.warn('[Sessão] Não foi possível guardar o perfil em cache:', error);

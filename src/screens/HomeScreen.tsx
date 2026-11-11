@@ -55,6 +55,8 @@ const EXPANDED_PANEL_TOP = 115;
 // Tempo que o aviso de "look salvo" fica na tela.
 const AVISO_LOOK_SALVO_MS = 3000;
 const AVISO_LOOK_SALVO = 'Look salvo na Galeria de Looks';
+// Mesmas peças de um look já salvo: o back não cria cópia, só o põe no topo.
+const AVISO_LOOK_JA_SALVO = 'Esse look já estava salvo e foi para o topo';
 
 /** O painel de baixo mostra as peças do armário ou os looks salvos. */
 type ModoPainel = 'armario' | 'galeria';
@@ -130,6 +132,41 @@ function HangerIcon() {
   );
 }
 
+/**
+ * A cada volta à Home o armário é lido de novo, e as URLs assinadas das fotos
+ * mudam em toda leitura. Peça que não mudou (mesmo id e mesmo atualizadoEm)
+ * fica com o objeto de antes: assim o memo do card funciona e o armário não é
+ * redesenhado inteiro sem motivo. A foto não muda: o cache dela usa o caminho
+ * no S3, sem a assinatura.
+ *
+ * As URLs expiram em 1 hora (s3.service.ts no back): um objeto lido há mais
+ * de 30 minutos é trocado pelo novo, para a foto grande da peça expandida
+ * nunca abrir com o link vencido.
+ */
+const REAPROVEITAR_PECA_POR_MS = 30 * 60_000;
+const lidaEm = new WeakMap<Peca, number>();
+
+function manterPecasIguais(anteriores: Peca[], novas: Peca[]): Peca[] {
+  const agora = Date.now();
+  const porId = new Map(anteriores.map((peca) => [peca.id, peca]));
+  const resultado = novas.map((nova) => {
+    const anterior = porId.get(nova.id);
+    if (
+      anterior &&
+      anterior.atualizadoEm === nova.atualizadoEm &&
+      agora - (lidaEm.get(anterior) ?? 0) < REAPROVEITAR_PECA_POR_MS
+    ) {
+      return anterior;
+    }
+    lidaEm.set(nova, agora);
+    return nova;
+  });
+  const nadaMudou =
+    resultado.length === anteriores.length &&
+    resultado.every((peca, i) => peca === anteriores[i]);
+  return nadaMudou ? anteriores : resultado;
+}
+
 export function HomeScreen({ navigation, route }: Props) {
   const { user, tokens } = useAuth();
   const nome = user?.nome ?? null;
@@ -140,11 +177,10 @@ export function HomeScreen({ navigation, route }: Props) {
   const [pecasError, setPecasError] = React.useState<string | null>(null);
 
   const [modo, setModo] = React.useState<ModoPainel>('armario');
-  // Filtro do armário por categoria (vazio = todas).
+  // Filtro do armário por categoria, uma de cada vez (null = todas).
   const [isFiltroAberto, setIsFiltroAberto] = React.useState(false);
-  const [categoriasFiltro, setCategoriasFiltro] = React.useState<Categoria[]>(
-    [],
-  );
+  const [categoriaFiltro, setCategoriaFiltro] =
+    React.useState<Categoria | null>(null);
   const [looks, setLooks] = React.useState<LookSalvo[]>([]);
   const [isLoadingLooks, setIsLoadingLooks] = React.useState(true);
   const [looksError, setLooksError] = React.useState<string | null>(null);
@@ -207,6 +243,21 @@ export function HomeScreen({ navigation, route }: Props) {
 
   // Aviso de "look salvo", disparado pelo chat ao voltar para a Home.
   const lookSalvoEm = route.params?.lookSalvoEm;
+  // Texto do último aviso, guardado durante a renderização (e não num efeito):
+  // o parâmetro é limpo logo depois, e o aviso continua na tela por 3 s.
+  const [ultimoAviso, setUltimoAviso] = React.useState<{
+    em: number;
+    jaEstavaSalvo: boolean;
+  } | null>(null);
+  if (lookSalvoEm && ultimoAviso?.em !== lookSalvoEm) {
+    setUltimoAviso({
+      em: lookSalvoEm,
+      jaEstavaSalvo: Boolean(route.params?.lookJaEstavaSalvo),
+    });
+  }
+  const textoDoAviso = ultimoAviso?.jaEstavaSalvo
+    ? AVISO_LOOK_JA_SALVO
+    : AVISO_LOOK_SALVO;
   const [avisoOpacity] = React.useState(() => new Animated.Value(0));
   // Fora do efeito: limpar o parâmetro roda o efeito de novo, e um cleanup
   // ali cancelaria o timer e deixaria o aviso preso na tela.
@@ -227,7 +278,9 @@ export function HomeScreen({ navigation, route }: Props) {
     if (avisoTimer.current) clearTimeout(avisoTimer.current);
 
     // Quem usa leitor de tela também fica sabendo, sem precisar achar o aviso.
-    AccessibilityInfo.announceForAccessibility(AVISO_LOOK_SALVO);
+    AccessibilityInfo.announceForAccessibility(
+      route.params?.lookJaEstavaSalvo ? AVISO_LOOK_JA_SALVO : AVISO_LOOK_SALVO,
+    );
 
     Animated.timing(avisoOpacity, {
       toValue: 1,
@@ -246,7 +299,12 @@ export function HomeScreen({ navigation, route }: Props) {
     }, AVISO_LOOK_SALVO_MS);
 
     // Limpa o parâmetro: voltar de outra tela não repete o aviso.
-    navigation.setParams({ lookSalvoEm: undefined });
+    navigation.setParams({
+      lookSalvoEm: undefined,
+      lookJaEstavaSalvo: undefined,
+    });
+    // O aviso só depende do instante: o outro parâmetro chega junto com ele.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lookSalvoEm, avisoOpacity, navigation]);
 
   // Recarrega sempre que a Home volta ao foco: é assim que a peça recém
@@ -262,7 +320,7 @@ export function HomeScreen({ navigation, route }: Props) {
       listarPecas(accessToken)
         .then((lista) => {
           if (ativo) {
-            setPecas(lista);
+            setPecas((anteriores) => manterPecasIguais(anteriores, lista));
             setPecasError(null);
           }
         })
@@ -421,6 +479,24 @@ export function HomeScreen({ navigation, route }: Props) {
     );
   }
 
+  // Mesma função para todos os cards da grade (só muda ao entrar ou sair da
+  // seleção): com o memo do ClosetItemCard, um toque redesenha só o card que
+  // mudou, e não o armário inteiro.
+  const handlePecaPress = React.useCallback(
+    (peca: Peca) => {
+      if (isSelecionando) {
+        setSelecionados((atuais) =>
+          atuais.includes(peca.id)
+            ? atuais.filter((item) => item !== peca.id)
+            : [...atuais, peca.id],
+        );
+      } else {
+        setPecaAberta(peca);
+      }
+    },
+    [isSelecionando],
+  );
+
   function handleAlternarGaleria() {
     encerrarSelecao();
     setModo((atual) => (atual === 'galeria' ? 'armario' : 'galeria'));
@@ -430,7 +506,7 @@ export function HomeScreen({ navigation, route }: Props) {
   // a faixa de categorias está à vista.
   function handleAlternarFiltro() {
     if (isFiltroAberto) {
-      setCategoriasFiltro([]);
+      setCategoriaFiltro(null);
     }
 
     setIsFiltroAberto(!isFiltroAberto);
@@ -440,15 +516,15 @@ export function HomeScreen({ navigation, route }: Props) {
     navigation.navigate('LookDetalhe', { look });
   }
 
-  // Só valem as categorias que ainda têm peça: se a pessoa excluir a última
-  // camiseta, "Camiseta" sai do filtro em vez de deixar o armário vazio.
-  const filtroAtivo = categoriasFiltro.filter((categoria) =>
-    pecas.some((peca) => peca.categoria === categoria),
-  );
-  const pecasVisiveis =
-    filtroAtivo.length > 0
-      ? pecas.filter((peca) => filtroAtivo.includes(peca.categoria))
-      : pecas;
+  // Só vale a categoria que ainda tem peça: se a pessoa excluir a última
+  // camiseta, o filtro volta para "Todas" em vez de deixar o armário vazio.
+  const filtroAtivo =
+    categoriaFiltro && pecas.some((peca) => peca.categoria === categoriaFiltro)
+      ? categoriaFiltro
+      : null;
+  const pecasVisiveis = filtroAtivo
+    ? pecas.filter((peca) => peca.categoria === filtroAtivo)
+    : pecas;
 
   // Peças marcadas que estão em looks salvos: esses looks saem junto.
   const looksAfetados = pecas
@@ -571,10 +647,7 @@ export function HomeScreen({ navigation, route }: Props) {
 
   return (
     <View style={styles.screen}>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={theme.colors.background}
-      />
+      <StatusBar barStyle="dark-content" />
 
       <View style={styles.header}>
         <Text style={styles.logo}>ZYRA</Text>
@@ -761,8 +834,8 @@ export function HomeScreen({ navigation, route }: Props) {
           {isFiltroAberto && modo === 'armario' && pecas.length > 0 ? (
             <FiltroCategorias
               pecas={pecas}
-              selecionadas={filtroAtivo}
-              onChange={setCategoriasFiltro}
+              selecionada={filtroAtivo}
+              onChange={setCategoriaFiltro}
             />
           ) : null}
 
@@ -809,7 +882,7 @@ export function HomeScreen({ navigation, route }: Props) {
             </Text>
           ) : pecasVisiveis.length === 0 ? (
             <Text style={[styles.closetEmptyText, styles.closetFeedback]}>
-              Nenhuma peça dessas categorias no seu armário.
+              Nenhuma peça dessa categoria no seu armário.
             </Text>
           ) : (
             <ScrollView
@@ -822,11 +895,7 @@ export function HomeScreen({ navigation, route }: Props) {
                   peca={peca}
                   selecionavel={isSelecionando}
                   selecionado={selecionados.includes(peca.id)}
-                  onPress={() =>
-                    isSelecionando
-                      ? alternarSelecao(peca.id)
-                      : setPecaAberta(peca)
-                  }
+                  onPressPeca={handlePecaPress}
                 />
               ))}
             </ScrollView>
@@ -854,7 +923,7 @@ export function HomeScreen({ navigation, route }: Props) {
           />
         </Svg>
 
-        <Text style={styles.avisoText}>{AVISO_LOOK_SALVO}</Text>
+        <Text style={styles.avisoText}>{textoDoAviso}</Text>
       </Animated.View>
 
       {isSelecionando ? (

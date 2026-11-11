@@ -31,7 +31,13 @@ export type RespostaLook =
     }
   | { tipo: 'PERGUNTA' | 'FORA_DE_ESCOPO' | 'CONVERSA'; mensagem: string }
   /** O usuário respondeu "sim" para "Quer salvar esse look?". */
-  | { tipo: 'SALVO'; mensagem: string; lookId: string }
+  | {
+      tipo: 'SALVO';
+      mensagem: string;
+      lookId: string;
+      /** As mesmas peças já estavam na galeria: o look só voltou para o topo. */
+      jaEstavaSalvo?: boolean;
+    }
   | { tipo: 'SEM_LOOK'; mensagem: string; avisos: string[] }
   | {
       tipo: 'LOOK';
@@ -80,6 +86,8 @@ export type LookSalvo = {
   nome: string | null;
   ocasiao: Ocasiao | null;
   criadoEm: string;
+  /** Última vez que a pessoa salvou o look; a galeria ordena por aqui. */
+  salvoEm: string;
   /** Já na ordem do look: superior, sobreposição, inferior, peça única, calçado. */
   pecas: PecaDoLook[];
 };
@@ -98,7 +106,8 @@ export type SalvarLookInput = {
  * look que já existe, sem criar cópia.
  */
 export function salvarLook(input: SalvarLookInput, token: string) {
-  return apiRequest<LookSalvo>('/looks', {
+  // jaEstavaSalvo: as mesmas peças já estavam na galeria; o look voltou para o topo.
+  return apiRequest<LookSalvo & { jaEstavaSalvo?: boolean }>('/looks', {
     method: 'POST',
     body: JSON.stringify(input),
     token,

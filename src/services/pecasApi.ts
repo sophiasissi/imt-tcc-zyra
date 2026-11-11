@@ -10,15 +10,19 @@ export type Categoria =
   | 'CROPPED'
   | 'TOP'
   | 'BODY'
+  | 'CORSET'
   | 'MOLETOM'
+  | 'SUETER'
   | 'JAQUETA'
   | 'BLAZER'
+  | 'COLETE'
   | 'CALCA'
   | 'SHORT'
   | 'SAIA'
   | 'VESTIDO'
   | 'TENIS'
   | 'SAPATO'
+  | 'BOTA'
   | 'SANDALIA'
   | 'CHINELO';
 export type Estilo =
@@ -51,6 +55,8 @@ export type Material =
   | 'VISCOSE'
   | 'VELUDO';
 export type Manga = 'SEM_MANGA' | 'CURTA' | 'LONGA';
+/** Altura do cano, só na bota. */
+export type Cano = 'CURTO' | 'MEDIO' | 'LONGO' | 'ACIMA_DO_JOELHO';
 
 /** Nome da categoria como aparece para a pessoa (e para o leitor de tela). */
 export const CATEGORIA_LABEL: Record<Categoria, string> = {
@@ -60,15 +66,19 @@ export const CATEGORIA_LABEL: Record<Categoria, string> = {
   CROPPED: 'cropped',
   TOP: 'top',
   BODY: 'body',
+  CORSET: 'corset',
   MOLETOM: 'moletom',
+  SUETER: 'suéter',
   JAQUETA: 'jaqueta',
   BLAZER: 'blazer',
+  COLETE: 'colete',
   CALCA: 'calça',
   SHORT: 'short',
   SAIA: 'saia',
   VESTIDO: 'vestido',
   TENIS: 'tênis',
   SAPATO: 'sapato',
+  BOTA: 'bota',
   SANDALIA: 'sandália',
   CHINELO: 'chinelo',
 };
@@ -111,6 +121,24 @@ const COM_MANGA_NO_NOME: Categoria[] = [
   'VESTIDO',
 ];
 
+// Mesma regra do back: é o cano que diferencia uma bota da outra.
+export const CANO_LABEL: Record<Cano, string> = {
+  CURTO: 'cano curto',
+  MEDIO: 'cano médio',
+  LONGO: 'cano longo',
+  ACIMA_DO_JOELHO: 'over the knee',
+};
+
+// Mesma regra do back: o corte de alfaiataria entra no nome no lugar da
+// fibra ("calça de alfaiataria", e não "calça de viscose de alfaiataria").
+const ALFAIATARIA_NO_NOME: Categoria[] = [
+  'CALCA',
+  'SHORT',
+  'SAIA',
+  'VESTIDO',
+  'COLETE',
+];
+
 function comMaterial(nome: string, material: Material) {
   return material === 'JEANS'
     ? `${nome} jeans`
@@ -119,12 +147,35 @@ function comMaterial(nome: string, material: Material) {
 
 /**
  * Nome da peça como a pessoa diria: "calça jeans", "calça de moletom",
- * "camiseta manga longa", "regata", "body manga longa", "casaco de moletom".
+ * "camiseta manga longa", "regata", "body manga longa", "casaco de moletom",
+ * "calça de alfaiataria", "camisa polo".
  */
 export function nomeDaPeca(
-  peca: Pick<Peca, 'categoria'> & Partial<Pick<Peca, 'material' | 'manga'>>,
+  peca: Pick<Peca, 'categoria'> &
+    Partial<
+      Pick<Peca, 'material' | 'manga' | 'cano' | 'alfaiataria' | 'colarinho'>
+    >,
 ) {
-  const { categoria, material, manga } = peca;
+  const { categoria, manga, cano } = peca;
+  // Com o campo novo, ele manda; sem ele (peça antiga), vale o tecido.
+  const alfaiataria =
+    typeof peca.alfaiataria === 'boolean'
+      ? peca.alfaiataria
+      : peca.material === 'ALFAIATARIA';
+  // Couro e jeans identificam a peça mais que o corte ("calça de couro").
+  const fibraMarcante =
+    peca.material != null && MATERIAL_SEMPRE_NA_PECA.includes(peca.material);
+  const material =
+    alfaiataria && ALFAIATARIA_NO_NOME.includes(categoria) && !fibraMarcante
+      ? 'ALFAIATARIA'
+      : peca.material === 'ALFAIATARIA'
+        ? null
+        : peca.material;
+
+  // Camiseta com colarinho é a polo.
+  if (categoria === 'CAMISETA' && peca.colarinho === true) {
+    return manga === 'LONGA' ? 'camisa polo manga longa' : 'camisa polo';
+  }
 
   if (categoria === 'CAMISETA' && manga === 'SEM_MANGA') {
     return material && MATERIAL_SEMPRE_NA_PECA.includes(material)
@@ -141,13 +192,15 @@ export function nomeDaPeca(
   }
 
   let nome = CATEGORIA_LABEL[categoria];
+  if (categoria === 'BOTA' && cano) nome += ` ${CANO_LABEL[cano]}`;
 
   const materialNoNome =
     material &&
     // "Moletom de moletom" não diz nada.
     !(categoria === 'MOLETOM' && material === 'MOLETOM') &&
     (MATERIAL_SEMPRE_NO_NOME.includes(categoria) ||
-      MATERIAL_SEMPRE_NA_PECA.includes(material));
+      MATERIAL_SEMPRE_NA_PECA.includes(material) ||
+      (material === 'ALFAIATARIA' && ALFAIATARIA_NO_NOME.includes(categoria)));
   if (materialNoNome) nome = comMaterial(nome, material);
 
   if (COM_MANGA_NO_NOME.includes(categoria)) {
@@ -174,6 +227,12 @@ export type Peca = {
   material: Material | null;
   /** Só nas peças de cima, no body e no vestido. */
   manga: Manga | null;
+  /** Só na bota. */
+  cano: Cano | null;
+  /** Corte de alfaiataria, de qualquer fibra. Nulo nas peças antigas. */
+  alfaiataria?: boolean | null;
+  /** Gola de camisa (camisa, polo). Nulo nas peças antigas. */
+  colarinho?: boolean | null;
   corNome: string;
   hex: string;
   colorAddSymbol: string;
@@ -202,6 +261,7 @@ export type AtualizarPecaInput = Partial<
     Peca,
     | 'categoria'
     | 'manga'
+    | 'cano'
     | 'estilo'
     | 'estampa'
     | 'ocasioes'

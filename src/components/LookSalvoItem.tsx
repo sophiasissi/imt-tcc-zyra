@@ -41,7 +41,8 @@ export function LookSalvoItem({
 }: Props) {
   const peca = pecaPrincipal(look);
   const titulo = tituloDoLook(look);
-  const data = formatarDataPorExtenso(look.criadoEm);
+  // A data de quando foi salvo por último, que é a ordem da galeria.
+  const data = formatarDataPorExtenso(look.salvoEm ?? look.criadoEm);
 
   return (
     <TouchableOpacity

@@ -217,10 +217,7 @@ export function ChangePasswordScreen({ navigation }: Props) {
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <View style={styles.screen}>
-          <StatusBar
-            barStyle="dark-content"
-            backgroundColor={theme.colors.background}
-          />
+          <StatusBar barStyle="dark-content" />
 
           <View style={styles.header}>
             <TouchableOpacity
