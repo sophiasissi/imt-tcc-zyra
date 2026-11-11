@@ -162,7 +162,9 @@ export async function removeBackgroundFromImage(
     }
 
     const arquivo = new File(Paths.cache, `peca-sem-fundo-${Date.now()}.webp`);
-    arquivo.write(new Uint8Array(await response.arrayBuffer()));
+    // No SDK 58 o write() ficou assíncrono: sem o await, a foto sem fundo
+    // podia subir antes de terminar de gravar.
+    await arquivo.write(new Uint8Array(await response.arrayBuffer()));
     return arquivo.uri;
   } catch (error) {
     console.warn(

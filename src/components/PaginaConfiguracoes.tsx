@@ -25,10 +25,7 @@ type Props = {
 export function PaginaConfiguracoes({ title, onBack, children }: Props) {
   return (
     <View style={styles.screen}>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={theme.colors.background}
-      />
+      <StatusBar barStyle="dark-content" />
 
       <View style={styles.header}>
         <TouchableOpacity

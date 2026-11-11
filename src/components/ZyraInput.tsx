@@ -1,4 +1,4 @@
-import { type ReactNode, useRef } from 'react';
+import { type ComponentRef, type ReactNode, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -24,7 +24,7 @@ export function ZyraInput({
   onFocus,
   ...props
 }: Props) {
-  const wrapperRef = useRef<View>(null);
+  const wrapperRef = useRef<ComponentRef<typeof View>>(null);
   const avisarCampoFocado = useAvisarCampoFocado();
 
   return (

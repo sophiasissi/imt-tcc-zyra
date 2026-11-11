@@ -1,4 +1,5 @@
 import {
+  type ComponentRef,
   createContext,
   ReactNode,
   useCallback,
@@ -32,9 +33,9 @@ import { theme } from '../styles/theme';
  * Os campos (ZyraInput) avisam o layout quando recebem foco, para ele rolar
  * até o campo e o teclado ou o botão não o cobrirem.
  */
-const CampoFocadoContext = createContext<(campo: View | null) => void>(
-  () => undefined,
-);
+const CampoFocadoContext = createContext<
+  (campo: ComponentRef<typeof View> | null) => void
+>(() => undefined);
 
 export function useAvisarCampoFocado() {
   return useContext(CampoFocadoContext);
@@ -81,9 +82,9 @@ export function AuthLayout({
     footerButtonTitle && onFooterButtonPress,
   );
 
-  const containerRef = useRef<View>(null);
-  const scrollRef = useRef<ScrollView>(null);
-  const campoFocado = useRef<View | null>(null);
+  const containerRef = useRef<ComponentRef<typeof View>>(null);
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const campoFocado = useRef<ComponentRef<typeof View> | null>(null);
   const alturaVisivel = useRef(0);
   const alturaConteudo = useRef(0);
   const rolagem = useRef(0);
@@ -103,7 +104,9 @@ export function AuthLayout({
     const campo = campoFocado.current;
     // getInnerViewRef existe no ScrollView, mas falta nos tipos do React Native.
     const conteudo = (
-      scrollRef.current as unknown as { getInnerViewRef(): View | null } | null
+      scrollRef.current as unknown as {
+        getInnerViewRef(): ComponentRef<typeof View> | null;
+      } | null
     )?.getInnerViewRef();
 
     if (!campo || !conteudo || !alturaVisivel.current) {
@@ -175,7 +178,7 @@ export function AuthLayout({
   }, [espacoDoTeclado, revelarCampoFocado]);
 
   const avisarCampoFocado = useCallback(
-    (campo: View | null) => {
+    (campo: ComponentRef<typeof View> | null) => {
       campoFocado.current = campo;
       // Trocando de campo com o teclado já aberto, rola na hora. Na primeira
       // vez, espera o teclado terminar de abrir (ver animarEspaco).

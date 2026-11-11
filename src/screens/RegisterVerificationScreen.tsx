@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { type ComponentRef, useRef, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -98,7 +98,7 @@ export function RegisterVerificationScreen({ navigation, route }: Props) {
   const [isResending, setIsResending] = useState(false);
   const [popup, setPopup] = useState<ZyraPopupConfig | null>(null);
 
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<ComponentRef<typeof TextInput>>(null);
 
   const normalizedCode = code.replace(/\D/g, '').slice(0, 6);
   const canContinue = normalizedCode.length === 6 && !isLoading;
