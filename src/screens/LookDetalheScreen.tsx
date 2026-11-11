@@ -83,7 +83,7 @@ export function LookDetalheScreen({ navigation, route }: Props) {
   const [pecaAberta, setPecaAberta] = React.useState<PecaDoLook | null>(null);
 
   const titulo = tituloDoLook(look);
-  const data = formatarDataPorExtenso(look.criadoEm);
+  const data = formatarDataPorExtenso(look.salvoEm ?? look.criadoEm);
   const total = look.pecas.length;
   const paginas: Pagina[] = [
     { tipo: 'look' },

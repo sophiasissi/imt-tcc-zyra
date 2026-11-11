@@ -41,7 +41,6 @@ import {
 } from '../services/looksApi';
 import { Ocasiao } from '../services/pecasApi';
 import { theme } from '../styles/theme';
-import CameraSvg from '../../assets/icons/camera.svg';
 import ZyraAvatar from '../../assets/images/zyrabola.svg';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Chat'>;
@@ -97,7 +96,17 @@ type DialogoSalvar =
    * podeTentarDeNovo: false quando repetir não adianta (404: uma peça do look
    * foi excluída enquanto o chat estava aberto). Aí só resta sair.
    */
-  | { tipo: 'erro'; mensagem: string; podeTentarDeNovo: boolean };
+  | { tipo: 'erro'; mensagem: string; podeTentarDeNovo: boolean }
+  /**
+   * O look já estava na galeria (pedido da Sophia, 10/11/2026: antes o aviso
+   * passava despercebido). saindo: veio do "Salvar este look?" da saída; depois
+   * do OK, volta para a Home.
+   */
+  | { tipo: 'jaSalvo'; saindo: boolean };
+
+const TITULO_JA_SALVO = 'Esse look já está salvo';
+const MENSAGEM_JA_SALVO =
+  'Ele já estava na sua Galeria de Looks. Coloquei ele no topo para você achar mais fácil.';
 
 const ERRO_PADRAO =
   'Não consegui montar o look agora. Tente de novo em instantes.';
@@ -141,8 +150,9 @@ export function ChatScreen({ navigation, route }: Props) {
   const expandedState = React.useRef(false);
   // Lido dentro do PanResponder, que é criado uma vez só e não vê o estado novo.
   const isLookReadyRef = React.useRef(false);
-  const messagesScrollRef = React.useRef<ScrollView>(null);
-  const inputRef = React.useRef<TextInput>(null);
+  const messagesScrollRef =
+    React.useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const inputRef = React.useRef<React.ComponentRef<typeof TextInput>>(null);
   const recentPecaIds = React.useRef<string[]>([]);
   const messagesScrollY = React.useRef(0);
   const messagesViewportHeight = React.useRef(0);
@@ -162,6 +172,9 @@ export function ChatScreen({ navigation, route }: Props) {
   const accessToken = tokens?.accessToken ?? null;
 
   const [inputText, setInputText] = React.useState('');
+  // Entre o envio e a resposta, o campo fica bloqueado: uma mudança de texto
+  // nesse intervalo é o iOS devolvendo a mensagem enviada (ver handleChangeText).
+  const enviandoRef = React.useRef(false);
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [isLookReady, setIsLookReady] = React.useState(false);
   const [lookPecas, setLookPecas] = React.useState<PecaDoLook[]>([]);
@@ -331,6 +344,7 @@ export function ChatScreen({ navigation, route }: Props) {
   }
 
   function showLookWithCollapsedChat() {
+    enviandoRef.current = false;
     isLookReadyRef.current = true;
     setIsLookReady(true);
     setIsPanelExpanded(false);
@@ -387,7 +401,7 @@ export function ChatScreen({ navigation, route }: Props) {
     setIsSalvando(true);
 
     try {
-      await salvarLook(
+      const salvo = await salvarLook(
         {
           pecaIds: lookPecas.map((peca) => peca.id),
           pedido: lookPedido.current ?? undefined,
@@ -397,6 +411,14 @@ export function ChatScreen({ navigation, route }: Props) {
       );
 
       if (!isMounted.current) {
+        return;
+      }
+
+      lookJaSalvo.current = true;
+
+      if (salvo.jaEstavaSalvo) {
+        // Avisa aqui, num pop-up, antes de sair; a Home não repete o aviso.
+        setDialogoSalvar({ tipo: 'jaSalvo', saindo: true });
         return;
       }
 
@@ -431,6 +453,12 @@ export function ChatScreen({ navigation, route }: Props) {
     returnToHome();
   }
 
+  function handleFecharJaSalvo() {
+    const saindo = dialogoSalvar?.tipo === 'jaSalvo' && dialogoSalvar.saindo;
+    setDialogoSalvar(null);
+    if (saindo) returnToHome();
+  }
+
   // Lida pelo BackHandler, registrado uma vez só: aponta sempre para a versão
   // atual, que enxerga as peças do look na tela.
   const handleVoltarRef = React.useRef(handleVoltar);
@@ -455,7 +483,7 @@ export function ChatScreen({ navigation, route }: Props) {
     return () => subscription.remove();
   }, [navigation]);
 
-  function returnToHome({ lookSalvo = false } = {}) {
+  function returnToHome({ lookSalvo = false, jaEstavaSalvo = false } = {}) {
     if (isClosing.current) {
       return;
     }
@@ -491,7 +519,10 @@ export function ChatScreen({ navigation, route }: Props) {
       if (finished) {
         if (lookSalvo) {
           // A Home mostra o aviso de "look salvo" ao receber este parâmetro.
-          navigation.popTo('Home', { lookSalvoEm: Date.now() });
+          navigation.popTo('Home', {
+            lookSalvoEm: Date.now(),
+            lookJaEstavaSalvo: jaEstavaSalvo,
+          });
         } else {
           navigation.goBack();
         }
@@ -649,10 +680,6 @@ export function ChatScreen({ navigation, route }: Props) {
     }),
   ).current;
 
-  function handleCamera() {
-    navigation.navigate('CameraColorDetection');
-  }
-
   function replaceLoadingMessage(loadingId: string, text: string) {
     setMessages((currentMessages) =>
       currentMessages.map((message) =>
@@ -723,10 +750,15 @@ export function ChatScreen({ navigation, route }: Props) {
 
     // No iOS, um TextInput multilinha controlado às vezes reaparece com o texto
     // depois do envio; o clear() direto no campo garante que ele esvazie.
+    enviandoRef.current = true;
     setInputText('');
     inputRef.current?.clear();
     setIsGenerating(true);
     Keyboard.dismiss();
+    // Fechar o teclado confirma a autocorreção pendente, e o iOS manda o texto
+    // de volta depois do clear() acima (10/11/2026: a mensagem continuava no
+    // campo depois de enviada). Limpa de novo quando o teclado já fechou.
+    setTimeout(() => inputRef.current?.clear(), 150);
 
     try {
       // Na primeira mensagem, o sistema pede a permissão de localização.
@@ -769,6 +801,10 @@ export function ChatScreen({ navigation, route }: Props) {
 
       if (resposta.tipo === 'SALVO') {
         lookJaSalvo.current = true;
+        if (resposta.jaEstavaSalvo) {
+          Keyboard.dismiss();
+          setDialogoSalvar({ tipo: 'jaSalvo', saindo: false });
+        }
       }
 
       if (resposta.tipo === 'LOOK') {
@@ -804,9 +840,20 @@ export function ChatScreen({ navigation, route }: Props) {
       }
     }
 
+    enviandoRef.current = false;
     if (isMounted.current) {
       setIsGenerating(false);
     }
+  }
+
+  function handleChangeText(texto: string) {
+    // Com a mensagem enviada e o campo bloqueado, ninguém digita: a mudança é
+    // o iOS confirmando a autocorreção da mensagem que acabou de sair.
+    if (enviandoRef.current) {
+      inputRef.current?.clear();
+      return;
+    }
+    setInputText(texto);
   }
 
   // Sem um Touchable em volta da tela para fechar o teclado: ele virava o
@@ -1000,7 +1047,7 @@ export function ChatScreen({ navigation, route }: Props) {
             placeholderTextColor={theme.colors.titleZyra}
             style={styles.textInput}
             value={inputText}
-            onChangeText={setInputText}
+            onChangeText={handleChangeText}
             multiline
             // Enter envia; o texto longo quebra a linha sozinho.
             submitBehavior="submit"
@@ -1042,21 +1089,7 @@ export function ChatScreen({ navigation, route }: Props) {
                 </Svg>
               </LinearGradient>
             </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="Abrir câmera"
-              activeOpacity={0.8}
-              style={styles.cameraButton}
-              onPress={handleCamera}
-              disabled={isGenerating}
-            >
-              {/* O SVG tem ~25% de margem em volta do desenho: em 27 px a câmera
-                  aparece com ~20 px. Mesmo tamanho na Home e no chat, que trocam
-                  de lugar na transição. */}
-              <CameraSvg width={27} height={27} />
-            </TouchableOpacity>
-          )}
+          ) : null}
         </View>
       </Animated.View>
 
@@ -1070,12 +1103,16 @@ export function ChatScreen({ navigation, route }: Props) {
         title={
           dialogoSalvar?.tipo === 'erro'
             ? 'Não foi possível salvar'
-            : 'Salvar este look?'
+            : dialogoSalvar?.tipo === 'jaSalvo'
+              ? TITULO_JA_SALVO
+              : 'Salvar este look?'
         }
         message={
           dialogoSalvar?.tipo === 'erro'
             ? dialogoSalvar.mensagem
-            : 'Deseja guardar este look na sua Galeria de Looks?'
+            : dialogoSalvar?.tipo === 'jaSalvo'
+              ? MENSAGEM_JA_SALVO
+              : 'Deseja guardar este look na sua Galeria de Looks?'
         }
         buttonText={
           isSalvando
@@ -1084,25 +1121,38 @@ export function ChatScreen({ navigation, route }: Props) {
               ? dialogoSalvar.podeTentarDeNovo
                 ? 'Tentar de novo'
                 : 'Voltar para o início'
-              : 'Sim'
+              : dialogoSalvar?.tipo === 'jaSalvo'
+                ? 'Ok'
+                : 'Sim'
         }
         confirmDisabled={isSalvando}
         onConfirm={
-          dialogoSalvar?.tipo === 'erro' && !dialogoSalvar.podeTentarDeNovo
-            ? handleNaoSalvar
-            : handleSalvarLook
+          dialogoSalvar?.tipo === 'jaSalvo'
+            ? handleFecharJaSalvo
+            : dialogoSalvar?.tipo === 'erro' && !dialogoSalvar.podeTentarDeNovo
+              ? handleNaoSalvar
+              : handleSalvarLook
         }
         secondaryButtonText={
           dialogoSalvar?.tipo === 'erro'
             ? dialogoSalvar.podeTentarDeNovo
               ? 'Sair sem salvar'
               : undefined
-            : 'Não'
+            : dialogoSalvar?.tipo === 'jaSalvo'
+              ? undefined
+              : 'Não'
         }
         onSecondaryPress={handleNaoSalvar}
         secondaryVariant="botao"
-        // Voltar do Android com o popup aberto: fica no look, sem decidir.
+        // Tocar fora do popup fecha, para quem abriu sem querer (pedido da
+        // Sophia, 10/11/2026); igual ao voltar do Android: fica no look, sem
+        // decidir. No aviso de "já salvo", vale como o Ok.
+        closeOnBackdropPress
         onClose={() => {
+          if (dialogoSalvar?.tipo === 'jaSalvo') {
+            handleFecharJaSalvo();
+            return;
+          }
           if (!isSalvando) setDialogoSalvar(null);
         }}
       />
@@ -1292,13 +1342,6 @@ const styles = StyleSheet.create({
     color: theme.colors.titleZyra,
     fontFamily: theme.fonts.semiBold,
     fontSize: 14,
-  },
-  cameraButton: {
-    width: 36,
-    height: 36,
-    marginBottom: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   sendButton: {
     width: 36,

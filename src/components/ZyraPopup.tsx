@@ -1,5 +1,12 @@
 import { ReactNode } from 'react';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 import { theme } from '../styles/theme';
 import { ZyraButton } from './ZyraButton';
@@ -41,6 +48,12 @@ type Props = ZyraPopupConfig & {
    * telas em que o popup some e a navegação acontece no mesmo instante.
    */
   modal?: boolean;
+  /**
+   * Tocar no fundo escuro, fora do cartão, chama `onClose` (pedido da Sophia,
+   * 10/11/2026: sair do "Salvar este look?" tocado sem querer). Desligado por
+   * padrão: em alguns avisos a pessoa precisa escolher um botão.
+   */
+  closeOnBackdropPress?: boolean;
 };
 
 const variantConfig: Record<
@@ -83,6 +96,7 @@ export function ZyraPopup({
   secondaryVariant = 'link',
   confirmDisabled = false,
   modal = true,
+  closeOnBackdropPress = false,
 }: Props) {
   const currentVariant = variantConfig[variant];
 
@@ -111,6 +125,17 @@ export function ZyraPopup({
 
   return envolver(
     <View style={styles.overlay}>
+      {closeOnBackdropPress && onClose ? (
+        // Atrás do cartão: o toque no cartão não chega aqui. Fica fora da
+        // leitura do VoiceOver/TalkBack, que usa os botões ou o gesto de
+        // voltar (onRequestClose).
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessible={false}
+          importantForAccessibility="no"
+        />
+      ) : null}
       <View
         style={styles.card}
         accessibilityRole="alert"
