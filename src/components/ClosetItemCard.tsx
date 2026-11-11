@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import {
   Image,
   StyleProp,
@@ -22,6 +23,12 @@ type Props = {
   selecionavel?: boolean;
   selecionado?: boolean;
   onPress?: () => void;
+  /**
+   * Como onPress, mas recebe a peça. Na grade do armário, a Home passa a
+   * mesma função para todos os cards, e o memo evita redesenhar os ~70 cards
+   * a cada toque (abrir uma peça, marcar na seleção).
+   */
+  onPressPeca?: (peca: Peca) => void;
 };
 
 /**
@@ -30,13 +37,15 @@ type Props = {
  * A cor nunca aparece só pela foto — sempre com o nome escrito e o símbolo,
  * para quem não distingue a tonalidade na imagem.
  */
-export function ClosetItemCard({
+export const ClosetItemCard = memo(function ClosetItemCard({
   peca,
   style,
   selecionavel = false,
   selecionado = false,
-  onPress,
+  onPress: onPressSemPeca,
+  onPressPeca,
 }: Props) {
+  const onPress = onPressPeca ? () => onPressPeca(peca) : onPressSemPeca;
   const symbol = getColorAddSymbol(peca.colorAddSymbol);
   const nomeCor = symbol?.label ?? peca.corNome;
   const categoria = nomeDaPeca(peca);
@@ -91,7 +100,7 @@ export function ClosetItemCard({
       {conteudo}
     </TouchableOpacity>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {
