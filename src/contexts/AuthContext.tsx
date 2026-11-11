@@ -68,6 +68,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const isAuthenticated = Boolean(tokens?.accessToken && user);
 
+  /**
+   * Tokens em uso, para a renovação no meio do uso. O keychain é só a cópia
+   * para a próxima abertura: se ele falhar, a sessão continua com estes.
+   */
+  const tokensEmUso = useRef<StoredAuthTokens | null>(null);
+
+  useEffect(() => {
+    tokensEmUso.current = tokens;
+  }, [tokens]);
+
   const clearSessionState = useCallback(async () => {
     setTokens(null);
     setUser(null);
@@ -102,8 +112,21 @@ export function AuthProvider({ children }: PropsWithChildren) {
           : undefined,
       };
 
-      await saveAuthTokens(nextTokens);
+      // A renovação já valeu no servidor: uma falha ao gravar no keychain
+      // não pode jogar fora os tokens novos (era o "No keychain is
+      // available" do evento, que fazia a tela tomar 401). Na pior hipótese,
+      // a próxima abertura renova de novo com o refresh token guardado.
+      tokensEmUso.current = nextTokens;
       setTokens(nextTokens);
+
+      try {
+        await saveAuthTokens(nextTokens);
+      } catch (error) {
+        console.warn(
+          '[Sessão] Tokens renovados, mas não foi possível guardá-los:',
+          error,
+        );
+      }
 
       return nextTokens;
     },
@@ -137,7 +160,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     const renovacao = (async (): Promise<string | null> => {
       try {
-        const stored = await getAuthTokens();
+        const stored =
+          tokensEmUso.current ?? (await getAuthTokens().catch(() => null));
 
         if (!stored?.refreshToken) {
           return null;
